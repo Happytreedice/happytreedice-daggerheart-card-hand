@@ -1,0 +1,48 @@
+{
+    "QUICK_ITEMS": {
+        "TITLE": "Рука предметов",
+        "NO_ACTOR": "Выберите актера для отображения предметов",
+        "NO_ACCESS": "Нет доступа к предметам этого актера",
+        "NO_ITEMS": "У актера нет предметов",
+        "REFRESH": "Обновить руку",
+        "TOGGLE": "Свернуть/развернуть",
+        "SEARCH_PLACEHOLDER": "Поиск в руке...",
+        "FILTER_ALL": "Все карты",
+        "FILTER_WEAPON": "Оружие",
+        "FILTER_EQUIPMENT": "Снаряжение",
+        "FILTER_CONSUMABLE": "Расходники",
+        "FILTER_TOOL": "Инструменты",
+        "FILTER_LOOT": "Добыча",
+        "FILTER_ARMOR": "Броня",
+        "FILTER_SPELL": "Заклинания",
+        "CARD_TYPES": {
+            "WEAPON": "Оружие",
+            "EQUIPMENT": "Снаряжение",
+            "CONSUMABLE": "Расходник",
+            "TOOL": "Инструмент",
+            "LOOT": "Добыча",
+            "ARMOR": "Броня",
+            "SPELL": "Заклинание"
+        },
+        "CONTEXT_MENU": {
+            "USE": "Использовать",
+            "EDIT": "Редактировать",
+            "DELETE": "Удалить"
+        },
+        "PREVIEW": {
+            "USE_BUTTON": "Использовать",
+            "EDIT_BUTTON": "Редактировать"
+        },
+        "DELETE_CONFIRM": {
+            "TITLE": "Удаление предмета",
+            "CONTENT": "Вы уверены, что хотите удалить \"{name}\"?",
+            "SUCCESS": "Предмет \"{name}\" удален"
+        },
+        "NOTIFICATIONS": {
+            "EQUIPPED": "Предмет \"{name}\" экипирован",
+            "UNEQUIPPED": "Предмет \"{name}\" снят",
+            "USE_ERROR": "Ошибка при использовании предмета",
+            "DELETE_ERROR": "Ошибка при удалении предмета"
+        }
+    }
+}

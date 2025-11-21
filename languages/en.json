@@ -1,0 +1,48 @@
+{
+    "QUICK_ITEMS": {
+        "TITLE": "Items Hand",
+        "NO_ACTOR": "Select an actor to display items",
+        "NO_ACCESS": "No access to this actor's items",
+        "NO_ITEMS": "Actor has no items",
+        "REFRESH": "Refresh hand",
+        "TOGGLE": "Toggle panel",
+        "SEARCH_PLACEHOLDER": "Search in hand...",
+        "FILTER_ALL": "All cards",
+        "FILTER_WEAPON": "Weapons",
+        "FILTER_EQUIPMENT": "Equipment",
+        "FILTER_CONSUMABLE": "Consumables",
+        "FILTER_TOOL": "Tools",
+        "FILTER_LOOT": "Loot",
+        "FILTER_ARMOR": "Armor",
+        "FILTER_SPELL": "Spells",
+        "CARD_TYPES": {
+            "WEAPON": "Weapon",
+            "EQUIPMENT": "Equipment",
+            "CONSUMABLE": "Consumable",
+            "TOOL": "Tool",
+            "LOOT": "Loot",
+            "ARMOR": "Armor",
+            "SPELL": "Spell"
+        },
+        "CONTEXT_MENU": {
+            "USE": "Use",
+            "EDIT": "Edit",
+            "DELETE": "Delete"
+        },
+        "PREVIEW": {
+            "USE_BUTTON": "Use",
+            "EDIT_BUTTON": "Edit"
+        },
+        "DELETE_CONFIRM": {
+            "TITLE": "Delete Item",
+            "CONTENT": "Are you sure you want to delete \"{name}\"?",
+            "SUCCESS": "Item \"{name}\" deleted"
+        },
+        "NOTIFICATIONS": {
+            "EQUIPPED": "Item \"{name}\" equipped",
+            "UNEQUIPPED": "Item \"{name}\" unequipped",
+            "USE_ERROR": "Error using item",
+            "DELETE_ERROR": "Error deleting item"
+        }
+    }
+}
