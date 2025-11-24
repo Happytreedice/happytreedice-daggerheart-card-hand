@@ -6,17 +6,20 @@
   --dh-border: #3b3248;
   --dh-text: #f5f5f7;
   --dh-accent: #f2c24b;
-  
+
+  --dh-font-header: "Modesto Condensed", "Signika", sans-serif;
+  --dh-font-body: "Signika", sans-serif;
+
   position: fixed;
   bottom: 0;
   left: 50%;
   transform: translateX(-50%);
-  
-  width: auto; 
-  height: 0; 
-  
-  z-index: 20; /* Под интерфейсом Foundry */
-  font-family: "Signika", sans-serif;
+
+  width: auto;
+  height: 0;
+
+  z-index: 20;
+  font-family: var(--dh-font-body);
   display: flex;
   justify-content: center;
   align-items: flex-end;
@@ -27,40 +30,41 @@
   display: none !important;
 }
 
-/* Обертка контента (масштабируемая) */
+/* Обертка контента */
 .hand-wrapper {
   position: relative;
-  height: 250px; 
-  pointer-events: none; 
+  height: 250px;
+  pointer-events: none;
   transition: width 0.2s ease;
   display: flex;
   justify-content: center;
   align-items: flex-end;
 }
 
-/* Фоновая плашка (уменьшенная высота) */
+/* Фоновая плашка модуля */
 .hand-background-plate {
   position: absolute;
   bottom: 0;
   left: 0;
   width: 100%;
-  height: 192px; /* 220px (карта) - 1/8 (~28px) */
-  
+  height: 192px;
+
   background: rgba(20, 20, 25, 0.95);
   border-top: 2px solid var(--dh-border);
   border-radius: 16px 16px 0 0;
   box-shadow: 0 -5px 20px rgba(0, 0, 0, 0.8);
-  
+
   z-index: 0;
-  pointer-events: all; 
+  pointer-events: all;
 }
 
-/* Зона перетаскивания (вся плашка) */
+/* Зона перетаскивания */
 .drag-handle-area {
   width: 100%;
   height: 100%;
   cursor: grab;
 }
+
 .drag-handle-area:active {
   cursor: grabbing;
 }
@@ -73,34 +77,34 @@
   display: flex;
   justify-content: center;
   align-items: flex-end;
-  padding-bottom: 15px; 
-  overflow: visible; /* Карты должны вылезать при hover */
+  padding-bottom: 15px;
+  overflow: visible;
   z-index: 1;
   pointer-events: none;
 }
 
-/* --- КНОПКА СВОРАЧИВАНИЯ (Язычок справа) --- */
+/* КНОПКА СВОРАЧИВАНИЯ */
 .hand-toggle-tab {
   position: absolute;
-  right: -32px; 
-  bottom: 0;
+  right: -32px;
+  top: 0;
   width: 32px;
-  height: 48px; /* 1/4 от 192px */
-  
+  height: 48px;
+
   background: var(--dh-panel);
   border: 2px solid var(--dh-border);
   border-left: none;
   border-radius: 0 8px 8px 0;
-  
+
   display: flex;
   align-items: center;
   justify-content: center;
-  
+
   cursor: pointer;
   pointer-events: all;
   color: var(--dh-text);
   z-index: 2;
-  box-shadow: 2px 0 5px rgba(0,0,0,0.5);
+  box-shadow: 2px 0 5px rgba(0, 0, 0, 0.5);
   transition: background 0.2s;
 }
 
@@ -109,115 +113,266 @@
   color: var(--dh-accent);
 }
 
-/* --- КАРТЫ --- */
+#daggerheart-hand.collapsed .hand-wrapper {
+  height: 0;
+}
+
+#daggerheart-hand.collapsed .hand-background-plate {
+  display: none;
+}
+
+#daggerheart-hand.collapsed .hand-toggle-tab {
+  top: -40px;
+  height: 36px;
+  border: 2px solid var(--dh-border);
+  border-radius: 6px;
+  background: rgba(20, 20, 25, 0.9);
+}
+
+/* --- СТИЛИЗАЦИЯ КАРТ --- */
+
 .dh-card {
   position: relative;
   width: 160px;
   height: 220px;
-  background: var(--dh-surface);
-  border: 2px solid var(--dh-border);
-  border-radius: 10px;
-  box-shadow: -2px 2px 10px rgba(0,0,0,0.6);
-  
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  
-  cursor: grab;
-  pointer-events: all;
+  margin: 0;
   transform-origin: center bottom;
   flex-shrink: 0;
-  
-  transition: transform 0.1s ease-out, box-shadow 0.2s;
-  margin: 0;
+  cursor: grab;
+  pointer-events: all;
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  border-radius: 0;
+  transition: transform 0.1s ease-out;
+  overflow: visible;
 }
 
-/* Hover: Увеличиваем и поднимаем */
+/* Масштабируемая внутренняя часть (320x440 -> 160x220) */
+.dh-card-scaler {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 320px;
+  height: 440px;
+
+  transform: scale(0.5);
+  transform-origin: bottom left;
+
+  background: #fff;
+  border: 4px solid #d3d3d3;
+  color: #000;
+  display: flex;
+  flex-direction: column;
+
+  border-radius: 24px;
+  overflow: hidden;
+  box-shadow: -4px 4px 20px rgba(0, 0, 0, 0.6);
+
+  /* Плавность анимации увеличена до 0.3s */
+  transition: transform 0.6s cubic-bezier(0.25, 0.8, 0.25, 1), box-shadow 0.6s, border-color 0.6s;
+}
+
+.dh-card-scaler * {
+  font-family: var(--dh-font-body);
+}
+
 .dh-card:hover {
-  transform: translateY(-80px) scale(1.5) !important; 
   z-index: 1000 !important;
-  box-shadow: 0 30px 60px rgba(0,0,0,0.9);
-  border-color: var(--dh-accent);
 }
 
-.dh-card[data-type="domainCard"] { border-color: #ffd700; }
-.dh-card[data-type="spell"] { border-color: #a29bfe; }
-.dh-card[data-type="weapon"] { border-color: #ff7675; }
-.dh-card[data-type="ability"] { border-color: #55efc4; }
+.dh-card:hover .dh-card-scaler {
+  transform: translateY(-50px) scale(0.75);
+  box-shadow: 0 40px 80px rgba(0, 0, 0, 0.8);
+  border-color: #afb0d9;
+}
 
-.dh-card .card-image {
+.dh-card::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
   width: 100%;
-  height: 110px;
+  height: 100%;
+  z-index: 1001;
+  display: none;
+}
+
+.dh-card:hover::after {
+  display: block;
+}
+
+/* --- ЭЛЕМЕНТЫ КАРТЫ --- */
+
+/* 1. Level (Top Left) */
+.dh-card-scaler .card-level {
+  font-size: 23.8px;
+  top: 20.4px;
+  left: 19.04px;
+  width: 61.2px;
+  color: #fff;
+  text-align: center;
+  margin: 0;
+  user-select: none;
+  filter: drop-shadow(0 0 5px rgba(0, 0, 0, .3333333333));
+  position: absolute;
+  z-index: 10;
+  font-family: var(--dh-font-header);
+  font-weight: 800;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.8);
+  pointer-events: none;
+}
+
+.dh-card-scaler .card-banner_image {
+  left: 3px;
+  top: -15px;
+  box-sizing: border-box;
+  width: 52px;
+  position: absolute;
+  height: auto;
+  object-fit: scale-down;
+  border-radius: 0;
+  margin: 0 10px auto 0;
+  float: left;
+  filter: drop-shadow(0 0 2px rgba(0, 0, 0, .2));
+  z-index: 10;
+}
+
+/* 2. Stress/Recall (Top Right) */
+.dh-card-scaler .stress_image {
+  position: absolute;
+  width: 32px;
+  top: 3px;
+  right: 6px;
+  z-index: 2;
+  filter: drop-shadow(0 0 5px rgba(0, 0, 0, .333));
+}
+
+.dh-card-scaler .stress_text {
+  position: absolute;
+  font-family: var(--dh-font-header);
+  font-weight: 800;
+  top: 48px;
+  right: 48px;
+  /* Центр иконки */
+  width: 24px;
+  text-align: left;
+  font-size: 26px;
+  color: #fff;
+  z-index: 11;
+  margin: 0;
+  user-select: none;
+  pointer-events: none;
+}
+
+/* 3. Image Container */
+.dh-card-scaler .card-image-container {
+  width: 100%;
+  height: 220px;
+  overflow: hidden;
+  position: relative;
+  z-index: 1;
+  border-bottom: none;
+}
+
+.dh-card-scaler .card-main-image {
+  width: 100%;
+  height: 100%;
   object-fit: cover;
-  border-bottom: 1px solid var(--dh-border);
+  object-position: top center;
   background: #000;
 }
 
-.dh-card .card-body {
-  padding: 8px;
+/* 4. Divider & Title Wrapper */
+.dh-card-scaler .divider-container {
+  position: relative;
+  width: 100%;
+  height: 0;
+  /* Zero height so it overlaps boundaries */
+  z-index: 5;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+/* Strip Image (Divider) */
+.dh-card-scaler .divider {
+  position: relative;
+  top: 1.7px;
+  width: 120%;
+  max-width: unset;
+  user-select: none;
+  pointer-events: none;
+  /* Поднимаем вверх, чтобы перекрыть стык */
+  left: 50%;
+  transform: translateX(-50%);
+  /* Шире карты, как в референсе */
+  height: auto;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.4));
+  z-index: 5;
+}
+
+/* Title Text (On top of Divider) */
+.dh-card-scaler .title {
+  position: absolute;
+  top: -20px;
+  /* Позиционируем текст поверх стрипа */
+  left: 50%;
+  transform: translateX(-50%);
+  width: 90%;
+
+  font-family: var(--dh-font-header);
+  font-weight: 800;
+  text-transform: uppercase;
+  font-size: 28px;
+  line-height: 1;
+  text-align: center;
+  color: #fff;
+  /* Белый текст на цветном стрипе */
+  text-shadow: 0 2px 3px rgba(0, 0, 0, 0.6);
+
+  margin: 0;
+  z-index: 6;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* 5. Text Content */
+
+.dh-card-scaler .card-text-content {
+  /* Большой паддинг сверху, чтобы не наехать на стрип */
   flex-grow: 1;
-  background: linear-gradient(to bottom, var(--dh-surface), var(--dh-panel));
+  font-weight: 500;
+  font-size: 12.41px;
+  box-sizing: border-box;
+  padding: 9.5px 21.37px 21.37px;
+  width: 100%;
+  z-index: 6;
+  min-height: 237.46px;
+  position: relative;
+  background: #fff;
   display: flex;
   flex-direction: column;
-  gap: 4px;
 }
 
-.dh-card .card-title {
-  font-family: "Signika", sans-serif;
-  font-weight: 700;
-  font-size: 13px;
-  color: var(--dh-accent);
-  line-height: 1.1;
-  margin-bottom: 2px;
-  white-space: normal;
-  word-wrap: break-word; 
-  hyphens: auto;
-}
-
-.dh-card .card-desc {
-  font-size: 10px;
-  color: var(--dh-text);
-  opacity: 0.8;
-  line-height: 1.2;
+.dh-card-scaler .description {
+  font-size: 20px;
+  color: #000;
+  line-height: 1.3;
   overflow: hidden;
   display: -webkit-box;
-  -webkit-line-clamp: 5;
+  -webkit-line-clamp: 6;
   -webkit-box-orient: vertical;
 }
 
-/* --- БЕЙДЖИ --- */
-.card-badge {
-  position: absolute;
-  top: 4px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(0,0,0,0.8);
-  border: 1px solid var(--dh-accent);
-  border-radius: 4px;
-  padding: 2px 5px;
-  z-index: 5;
-  font-weight: 700;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.5);
+/* Dragging State */
+.dh-card.dragging {
+  opacity: 0.0;
 }
 
-.recall-badge {
-  left: 4px;
-  color: #fff;
-  min-width: 20px;
-  height: 20px;
-  border-radius: 50%;
-  border-color: #ffd700;
-}
-
-.domain-badge {
-  right: 4px;
-  color: var(--dh-accent);
-  text-transform: uppercase;
-}
-.domain-badge span {
-  font-size: 9px;
-  letter-spacing: 0.5px;
+body.dh-dragging {
+  user-select: none;
 }
 
 .no-cards {
@@ -225,10 +380,6 @@
   opacity: 0.5;
   align-self: center;
   font-style: italic;
-  margin-bottom: 80px; /* Поднимаем текст, чтобы не перекрывался плашкой */
+  margin-bottom: 80px;
   pointer-events: all;
-}
-
-body.dh-dragging {
-  user-select: none;
 }

@@ -349,104 +349,77 @@ class QuickItemsDaggerheart {
     static createCardElement(item) {
         const img = item.img || 'icons/svg/item-bag.svg';
         const desc = item.system.description?.value || item.system.description || "";
-
-        const tempDiv = document.createElement("div");
-        tempDiv.innerHTML = desc;
-        let plainDesc = tempDiv.textContent || tempDiv.innerText || "";
-        if (plainDesc.length > 160) plainDesc = plainDesc.substring(0, 160) + "...";
+        const plainDesc = $(`<div>${desc}</div>`).text().trim().substring(0, 160) + (desc.length > 160 ? "..." : "");
 
         const dragData = { type: "Item", uuid: item.uuid, data: item.toObject() };
 
-        // --- Paths ---
-        let domainKey = "default";
-        if (item.system.domain) {
-            domainKey = item.system.domain.toLowerCase();
-        } else if (item.type === 'class') {
-            domainKey = item.name.toLowerCase();
+        // Логика бейджей (Domain Cards)
+        let badgesHtml = '';
+        if (item.type === 'domainCard') {
+            const cost = item.system.recallCost || 0;
+            const domainKey = item.system.domain;
+            // Попытка получить иконку домена из конфига системы
+            const domainConfig = CONFIG.DH?.DOMAIN?.domains?.[domainKey];
+            const domainIconSrc = domainConfig?.src || 'icons/svg/item-bag.svg';
+
+            badgesHtml = `
+                <div class="badges-container">
+                    <div class="card-badge recall-badge" title="Recall Cost">
+                        <span class="value">${cost}</span>
+                        <i class="fa-solid fa-bolt"></i>
+                    </div>
+                    <div class="card-badge domain-badge" title="Domain: ${domainConfig?.label || domainKey}">
+                         <img src="${domainIconSrc}" class="domain-icon">
+                    </div>
+                </div>
+            `;
         }
 
-        // Strip image acts as the divider
-        const stripSrc = `modules/happytreedice-daggerheart-card-hand/assets/imgs/${domainKey}/strip.avif`;
-        const bannerSrc = `modules/happytreedice-daggerheart-card-hand/assets/imgs/${domainKey}/banner.avif`;
-        const stressSrc = `modules/happytreedice-daggerheart-card-hand/assets/imgs/default/stress-cost.avif`;
-
-        // Level
-        const level = item.system.level || "";
-
-        // Recall Cost / Stress
-        const recallCost = item.system.recallCost;
-        const stressCost = item.system.stress;
-        // Check specifically for null/undefined to allow 0 if that's a valid cost in DH
-        let costValue = '';
-        if (recallCost !== null && recallCost !== undefined && recallCost !== 0) {
-            costValue = recallCost;
-        } else if (stressCost !== null && stressCost !== undefined && stressCost !== 0) {
-            costValue = stressCost;
-        }
-
-        const showStress = costValue !== '';
-
-        // HTML Structure
         const html = `
-            <div class="dh-card" data-item-id="${item.id}" draggable="true" data-type="${item.type}">
-                <div class="dh-card-scaler">
-                    
-                    <!-- 1. Level (Top Left) -->
-                    ${level ? `
-                    <img class="card-banner_image" src="${bannerSrc}">
-                    <div class="card-level">${level}</div>
-                    ` : ''}
-
-                    <!-- 2. Stress/Recall (Top Right) -->
-                    ${showStress ? `
-                    <img class="stress_image" src="${stressSrc}">
-                    <div class="stress_text">${costValue}</div>
-                    ` : ''}
-
-                    <!-- 3. Image Container -->
-                    <div class="card-image-container">
-                        <img class="card-main-image" src="${img}" draggable="false">
-                    </div>
-
-                    <!-- 4. Divider (Strip) & Title -->
-                    <div class="divider-container">
-                         <img class="divider" src="${stripSrc}" onerror="this.style.display='none'">
-                         <p class="title">${item.name}</p>
-                    </div>
-
-                    <!-- 5. Description -->
-                    <div class="card-text-content">
-                        <div class="description">
-                            ${plainDesc}
-                        </div>
-                    </div>
+            <div class="dh-card" data-item-id="${item.id}" draggable="true">
+                ${badgesHtml}
+                <img class="card-image" src="${img}" draggable="false">
+                <div class="card-body">
+                    <div class="card-title">${item.name}</div>
+                    <div class="card-desc">${plainDesc}</div>
                 </div>
             </div>
         `;
 
         const $el = $(html);
 
-        // --- Drag & Drop ---
+        // --- ВИЗУАЛИЗАЦИЯ ПЕРЕТАСКИВАНИЯ (КЛОН) ---
         $el[0].addEventListener('dragstart', (ev) => {
             this.playSound('modules/happytreedice-daggerheart-card-hand/sounds/Card_Transition_Out.ogg');
             ev.dataTransfer.setData("text/plain", JSON.stringify(dragData));
             ev.dataTransfer.effectAllowed = "copy";
 
+            // Создаем точную копию карты для "призрака"
             const clone = $el[0].cloneNode(true);
+
+            // Настраиваем стили клона, чтобы он был видимым, но не влиял на лейаут
             clone.style.position = "absolute";
-            clone.style.top = "-1000px";
+            clone.style.top = "-1000px"; // Спрятать за границами, пока браузер делает снимок
             clone.style.left = "-1000px";
             clone.style.width = "160px";
             clone.style.height = "220px";
-            clone.style.transform = "none";
+            clone.style.transform = "none"; // Убираем поворот веера
             clone.style.zIndex = "99999";
-            clone.style.opacity = "1";
-            clone.classList.remove('dragging');
+            clone.style.opacity = "1"; // Полная непрозрачность для картинки
+            clone.classList.remove('dragging'); // Убираем класс прозрачности, если есть
 
             document.body.appendChild(clone);
+
+            // Устанавливаем клон как картинку перетаскивания
+            // (центрируем курсор: 80px по X, 110px по Y)
             ev.dataTransfer.setDragImage(clone, 80, 110);
 
-            setTimeout(() => { document.body.removeChild(clone); }, 0);
+            // Удаляем клон сразу после того, как браузер "сфотографировал" его
+            setTimeout(() => {
+                document.body.removeChild(clone);
+            }, 0);
+
+            // Делаем оригинальную карту в руке полупрозрачной
             $el.addClass('dragging');
         });
 
