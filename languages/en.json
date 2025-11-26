@@ -5,7 +5,21 @@
         "NO_ACCESS": "No access to this actor's items",
         "NO_ITEMS": "Actor has no items",
         "REFRESH": "Refresh hand",
-        "TOGGLE": "Toggle panel",
+        "TOGGLE_TOOL": "Daggerheart Cards",
+        "SETTINGS": {
+            "ARC_ANGLE_NAME": "Card Arc Angle",
+            "ARC_ANGLE_HINT": "Maximum fan angle. 0 = straight line.",
+            "FILTER_EQUIPPED_NAME": "Show Equipped Only",
+            "FILTER_EQUIPPED_HINT": "Hides items that are not equipped.",
+            "SCALE_NAME": "Interface Scale",
+            "SCALE_HINT": "Module size multiplier (0.5 - 2.0).",
+            "WIDTH_NAME": "Panel Width (px)",
+            "WIDTH_HINT": "Fixed width of the card panel (min 600)."
+        },
+        "TOOLTIPS": {
+            "DRAG": "Drag (X)",
+            "TOGGLE": "Collapse/Expand"
+        },
         "SEARCH_PLACEHOLDER": "Search in hand...",
         "FILTER_ALL": "All cards",
         "FILTER_WEAPON": "Weapons",

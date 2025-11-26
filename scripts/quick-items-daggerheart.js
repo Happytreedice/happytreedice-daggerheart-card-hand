@@ -13,11 +13,15 @@ class QuickItemsDaggerheart {
 
     static _currentActor = null;
     static _isCollapsed = false;
+    static _dndInstance = null; // Экземпляр SmoothDnD для панели
 
     static init() {
         console.log('Quick Items Daggerheart | Init');
 
-        this.registerSettings();
+        Hooks.once('i18nInit', () => {
+            this.registerSettings();
+        });
+        
         this.loadTranslations();
 
         Hooks.once('ready', () => {
@@ -33,8 +37,8 @@ class QuickItemsDaggerheart {
 
     static registerSettings() {
         game.settings.register(this.MODULE_NAME, this.SETTING_ARC_ANGLE, {
-            name: "Угол арки карт",
-            hint: "Максимальный угол наклона веера. 0 = прямая линия.",
+            name: this.translate("SETTINGS.ARC_ANGLE_NAME"),
+            hint: this.translate("SETTINGS.ARC_ANGLE_HINT"),
             scope: "client",
             config: true,
             type: Number,
@@ -44,8 +48,8 @@ class QuickItemsDaggerheart {
         });
 
         game.settings.register(this.MODULE_NAME, this.SETTING_FILTER_EQUIPPED, {
-            name: "Показывать только экипированное",
-            hint: "Скрывает предметы, которые не экипированы.",
+            name: this.translate("SETTINGS.FILTER_EQUIPPED_NAME"),
+            hint: this.translate("SETTINGS.FILTER_EQUIPPED_HINT"),
             scope: "client",
             config: true,
             type: Boolean,
@@ -54,8 +58,8 @@ class QuickItemsDaggerheart {
         });
 
         game.settings.register(this.MODULE_NAME, this.SETTING_SCALE, {
-            name: "Масштаб интерфейса",
-            hint: "Множитель размера модуля (0.5 - 2.0).",
+            name: this.translate("SETTINGS.SCALE_NAME"),
+            hint: this.translate("SETTINGS.SCALE_HINT"),
             scope: "client",
             config: true,
             type: Number,
@@ -65,8 +69,8 @@ class QuickItemsDaggerheart {
         });
 
         game.settings.register(this.MODULE_NAME, this.SETTING_WIDTH, {
-            name: "Ширина панели (px)",
-            hint: "Фиксированная ширина панели карт (минимум 600).",
+            name: this.translate("SETTINGS.WIDTH_NAME"),
+            hint: this.translate("SETTINGS.WIDTH_HINT"),
             scope: "client",
             config: true,
             type: Number,
@@ -80,16 +84,13 @@ class QuickItemsDaggerheart {
     }
 
     static loadTranslations() {
-        this.i18n = {
-            TITLE: "Hand",
-            NO_ACTOR: "Нет актера",
-            NO_ITEMS: "Пусто",
-            TOGGLE_TOOL: "Карты Daggerheart"
-        };
+        // Загрузка первичных переводов, если нужно, но полагаемся на i18n
     }
 
     static translate(key) {
-        return this.i18n[key] || key;
+        const fullKey = `QUICK_ITEMS.${key}`;
+        if (game.i18n.has(fullKey)) return game.i18n.localize(fullKey);
+        return game.i18n.localize(key);
     }
 
     static itemHasActions(item) {
@@ -111,7 +112,6 @@ class QuickItemsDaggerheart {
         Hooks.on("deleteItem", (item) => { if (item.parent?.id === this._currentActor?.id) this.refreshHand(); });
         Hooks.on("updateItem", (item) => { if (item.parent?.id === this._currentActor?.id) this.refreshHand(); });
 
-        // Scene Controls
         Hooks.on("getSceneControlButtons", (controls) => {
             const tokenTools = controls.find(c => c.name === "token");
             if (tokenTools) {
@@ -158,19 +158,22 @@ class QuickItemsDaggerheart {
     static createHandPanel() {
         if ($('#daggerheart-hand').length) return;
 
+        const dragTitle = this.translate("TOOLTIPS.DRAG");
+        const toggleTitle = this.translate("TOOLTIPS.TOGGLE");
+
         const html = `
             <div id="daggerheart-hand">
                 <div class="hand-wrapper">
-                    <div class="hand-background-plate">
-                        <div class="drag-handle-area" title="Перетащить (X)"></div>
+                    <div class="hand-background-plate" id="dh-hand-drag-target">
+                        <div class="drag-handle-area" title="${dragTitle}"></div>
                     </div>
                     
                     <div class="dh-cards-container">
                         <div class="no-cards">${this.translate('NO_ACTOR')}</div>
                     </div>
                     
-                    <!-- Кнопка сворачивания (справа сверху) -->
-                    <div class="hand-toggle-tab" title="Свернуть/Развернуть">
+                    <!-- Кнопка сворачивания -->
+                    <div class="hand-toggle-tab" title="${toggleTitle}">
                         <i class="fas fa-chevron-down"></i>
                     </div>
                 </div>
@@ -182,7 +185,6 @@ class QuickItemsDaggerheart {
 
         this.applyStyles();
 
-        // Toggle Logic
         $panel.find('.hand-toggle-tab').click(() => {
             this._isCollapsed = !this._isCollapsed;
             const $container = $panel.find('.dh-cards-container');
@@ -202,7 +204,10 @@ class QuickItemsDaggerheart {
             }
         });
 
-        this.initSmoothDrag($panel);
+        // Инициализация перетаскивания панели
+        this._dndInstance = new SmoothDnD('#daggerheart-hand', '#dh-hand-drag-target', (newLeft) => {
+            this.savePosition(newLeft);
+        });
     }
 
     static applyStyles() {
@@ -222,57 +227,6 @@ class QuickItemsDaggerheart {
         this.applyCardFanLayout();
     }
 
-    static initSmoothDrag($element) {
-        const $handle = $element.find('.hand-background-plate');
-        let isDragging = false;
-        let startX = 0;
-        let initialLeft = 0;
-        let currentTranslateX = 0;
-
-        $handle.on('mousedown', (e) => {
-            if (e.button !== 0) return;
-            if ($(e.target).closest('.dh-card').length) return;
-
-            isDragging = true;
-            startX = e.clientX;
-
-            const style = window.getComputedStyle($element[0]);
-            initialLeft = parseFloat(style.left);
-
-            $element.css('transform', 'none');
-            $('body').addClass('dh-dragging');
-            $handle.css('cursor', 'grabbing');
-        });
-
-        $(document).on('mousemove', (e) => {
-            if (!isDragging) return;
-            const deltaX = e.clientX - startX;
-            $element.css('transform', `translate3d(${deltaX}px, 0, 0)`);
-            currentTranslateX = deltaX;
-        });
-
-        $(document).on('mouseup', () => {
-            if (!isDragging) return;
-            isDragging = false;
-
-            $('body').removeClass('dh-dragging');
-            $handle.css('cursor', 'default');
-
-            let finalLeft = initialLeft + currentTranslateX;
-            const panelWidth = $element.outerWidth();
-            const maxLeft = window.innerWidth - (panelWidth / 2);
-            finalLeft = Math.max(-(panelWidth / 2), Math.min(finalLeft, maxLeft));
-
-            $element.css({
-                left: `${finalLeft}px`,
-                transform: 'translateX(-50%)'
-            });
-
-            this.savePosition(finalLeft);
-            $element.css('transform', 'translateX(0)');
-        });
-    }
-
     static async savePosition(left) {
         await game.user.setFlag(this.MODULE_NAME, 'handPosition', { left });
     }
@@ -280,11 +234,16 @@ class QuickItemsDaggerheart {
     static restorePosition() {
         const pos = game.user.getFlag(this.MODULE_NAME, 'handPosition');
         if (pos && pos.left !== undefined) {
-            $('#daggerheart-hand').css({
+            const $panel = $('#daggerheart-hand');
+            $panel.css({
                 left: `${pos.left}px`,
                 transform: 'translateX(0)',
                 bottom: '0px'
             });
+
+            if (this._dndInstance) {
+                this._dndInstance.updatePosition(pos.left);
+            }
         }
     }
 
@@ -355,9 +314,6 @@ class QuickItemsDaggerheart {
         let plainDesc = tempDiv.textContent || tempDiv.innerText || "";
         if (plainDesc.length > 160) plainDesc = plainDesc.substring(0, 160) + "...";
 
-        const dragData = { type: "Item", uuid: item.uuid, data: item.toObject() };
-
-        // --- Paths ---
         let domainKey = "default";
         if (item.system.domain) {
             domainKey = item.system.domain.toLowerCase();
@@ -388,37 +344,19 @@ class QuickItemsDaggerheart {
 
         // HTML Structure
         const html = `
-            <div class="dh-card" data-item-id="${item.id}" draggable="true" data-type="${item.type}">
+            <div class="dh-card" data-item-id="${item.id}" data-type="${item.type}">
                 <div class="dh-card-scaler">
-                    
-                    <!-- 1. Level (Top Left) -->
-                    ${level ? `
-                    <img class="card-banner_image" src="${bannerSrc}">
-                    <div class="card-level">${level}</div>
-                    ` : ''}
-
-                    <!-- 2. Stress/Recall (Top Right) -->
-                    ${showStress ? `
-                    <img class="stress_image" src="${stressSrc}">
-                    <div class="stress_text">${costValue}</div>
-                    ` : ''}
-
-                    <!-- 3. Image Container -->
+                    ${level ? `<img class="card-banner_image" src="${bannerSrc}"><div class="card-level">${level}</div>` : ''}
+                    ${showStress ? `<img class="stress_image" src="${stressSrc}"><div class="stress_text">${costValue}</div>` : ''}
                     <div class="card-image-container">
                         <img class="card-main-image" src="${img}" draggable="false">
                     </div>
-
-                    <!-- 4. Divider (Strip) & Title -->
                     <div class="divider-container">
                          <img class="divider" src="${stripSrc}" onerror="this.style.display='none'">
                          <p class="title">${item.name}</p>
                     </div>
-
-                    <!-- 5. Description -->
                     <div class="card-text-content">
-                        <div class="description">
-                            ${plainDesc}
-                        </div>
+                        <div class="description">${plainDesc}</div>
                     </div>
                 </div>
             </div>
@@ -426,35 +364,21 @@ class QuickItemsDaggerheart {
 
         const $el = $(html);
 
-        // --- Drag & Drop ---
-        $el[0].addEventListener('dragstart', (ev) => {
-            this.playSound('modules/happytreedice-daggerheart-card-hand/sounds/Card_Transition_Out.ogg');
-            ev.dataTransfer.setData("text/plain", JSON.stringify(dragData));
-            ev.dataTransfer.effectAllowed = "copy";
-
-            const clone = $el[0].cloneNode(true);
-            clone.style.position = "absolute";
-            clone.style.top = "-1000px";
-            clone.style.left = "-1000px";
-            clone.style.width = "160px";
-            clone.style.height = "220px";
-            clone.style.transform = "none";
-            clone.style.zIndex = "99999";
-            clone.style.opacity = "1";
-            clone.classList.remove('dragging');
-
-            document.body.appendChild(clone);
-            ev.dataTransfer.setDragImage(clone, 80, 110);
-
-            setTimeout(() => { document.body.removeChild(clone); }, 0);
-            $el.addClass('dragging');
+        // Инициализируем новую логику плавного перетаскивания для карты
+        // Мы передаем callback, который сработает если карту "вытянули" вверх (попытка использования)
+        new CardSmoothDnD($el[0], () => {
+            this.useItem(item);
+        }, () => {
+            // Callback при завершении перетаскивания (возврат в руку), чтобы обновить веер
+            this.applyCardFanLayout();
         });
 
-        $el[0].addEventListener('dragend', () => {
-            $el.removeClass('dragging');
-        });
-
-        $el.on('click', (event) => this.useItem(item, event));
+        // Клик всё ещё работает, если перетаскивание не произошло
+        // $el.on('click', (event) => {
+        //     // CardSmoothDnD предотвратит клик если было движение,
+        //     // но на всякий случай оставим вызов здесь, если событие не было перехвачено.
+        //     this.useItem(item, event);
+        // });
 
         return $el;
     }
@@ -482,6 +406,9 @@ class QuickItemsDaggerheart {
         marginLeft = Math.min(marginLeft, 5);
 
         cards.each((index, element) => {
+            // Если карта сейчас перетаскивается, мы не трогаем её стили (она управляется CardSmoothDnD)
+            if (element.classList.contains('dragging')) return;
+
             if (index > 0) {
                 $(element).css('margin-left', `${marginLeft}px`);
             } else {
@@ -544,6 +471,232 @@ class QuickItemsDaggerheart {
             return item.displayCard({ speaker });
         }
         item.toChat?.();
+    }
+}
+
+/**
+ * Класс перетаскивания самой панели (влево-вправо).
+ * Ограничивает движение по оси Y.
+ */
+class SmoothDnD {
+    constructor(elementSelector, handleSelector, onSavePosition) {
+        this.el = document.querySelector(elementSelector);
+        this.handle = this.el.querySelector(handleSelector);
+        this.onSavePosition = onSavePosition;
+
+        this.isDragging = false;
+        this.startX = 0;
+        this.initialLeft = 0;
+        this.currentX = 0;
+
+        this.onDragStart = this.onDragStart.bind(this);
+        this.onDragMove = this.onDragMove.bind(this);
+        this.onDragEnd = this.onDragEnd.bind(this);
+
+        this.init();
+    }
+
+    init() {
+        if (!this.handle) return;
+        this.handle.addEventListener('mousedown', this.onDragStart);
+        this.handle.addEventListener('touchstart', this.onDragStart, { passive: false });
+    }
+
+    updatePosition(left) {
+        this.initialLeft = left;
+    }
+
+    onDragStart(e) {
+        if (e.type === 'mousedown' && e.button !== 0) return;
+        this.isDragging = true;
+        this.startX = (e.type === 'touchstart') ? e.touches[0].clientX : e.clientX;
+
+        const style = window.getComputedStyle(this.el);
+        this.initialLeft = parseFloat(style.left) || 0;
+
+        this.el.classList.add('dragging');
+        document.body.style.cursor = "grabbing";
+        document.body.classList.add('dragging-active');
+
+        document.addEventListener('mousemove', this.onDragMove);
+        document.addEventListener('mouseup', this.onDragEnd);
+        document.addEventListener('touchmove', this.onDragMove, { passive: false });
+        document.addEventListener('touchend', this.onDragEnd);
+    }
+
+    onDragMove(e) {
+        if (!this.isDragging) return;
+        if (e.type === 'touchmove') e.preventDefault();
+
+        const clientX = (e.type === 'touchmove') ? e.touches[0].clientX : e.clientX;
+        const dx = clientX - this.startX;
+
+        // Блокируем Y, меняем только X
+        this.el.style.transform = `translate3d(calc(-50% + ${dx}px), 0, 0)`;
+        this.currentX = dx;
+    }
+
+    onDragEnd(e) {
+        if (!this.isDragging) return;
+        this.isDragging = false;
+        this.el.classList.remove('dragging');
+        document.body.style.cursor = "default";
+        document.body.classList.remove('dragging-active');
+
+        let finalLeft = this.initialLeft + this.currentX;
+        const panelWidth = this.el.offsetWidth;
+        const maxLeft = window.innerWidth - (panelWidth / 4);
+
+        this.el.style.left = `${finalLeft}px`;
+        this.el.style.transform = `translateX(-50%)`;
+
+        if (this.onSavePosition) {
+            this.onSavePosition(finalLeft);
+        }
+
+        document.removeEventListener('mousemove', this.onDragMove);
+        document.removeEventListener('mouseup', this.onDragEnd);
+        document.removeEventListener('touchmove', this.onDragMove);
+        document.removeEventListener('touchend', this.onDragEnd);
+    }
+}
+
+/**
+ * НОВЫЙ КЛАСС: Плавное перетаскивание карт.
+ * Заменяет HTML5 Drag API.
+ */
+class CardSmoothDnD {
+    constructor(element, onDropToPlay, onReturnToHand) {
+        this.el = element;
+        this.onDropToPlay = onDropToPlay;
+        this.onReturnToHand = onReturnToHand;
+
+        this.isDragging = false;
+        this.startX = 0;
+        this.startY = 0;
+
+        // Храним исходное смещение в веере
+        this.initialTransform = '';
+
+        this.startClientX = 0;
+        this.startClientY = 0;
+
+        this.onDragStart = this.onDragStart.bind(this);
+        this.onDragMove = this.onDragMove.bind(this);
+        this.onDragEnd = this.onDragEnd.bind(this);
+
+        this.init();
+    }
+
+    init() {
+        this.el.addEventListener('mousedown', this.onDragStart);
+        this.el.addEventListener('touchstart', this.onDragStart, { passive: false });
+    }
+
+    onDragStart(e) {
+        if (e.type === 'mousedown' && e.button !== 0) return;
+
+        // Предотвращаем конфликт с кликом для использования (если это просто клик, mouseup сработает быстро)
+        // Но здесь мы не preventDefault, чтобы клик мог пройти, если движения не было.
+
+        this.isDragging = true;
+
+        if (e.type === 'touchstart') {
+            this.startClientX = e.touches[0].clientX;
+            this.startClientY = e.touches[0].clientY;
+        } else {
+            this.startClientX = e.clientX;
+            this.startClientY = e.clientY;
+        }
+
+        // Запоминаем текущий стиль, чтобы вернуть если что
+        this.initialTransform = this.el.style.transform;
+
+        // Включаем стили перетаскивания
+        this.el.classList.add('dragging');
+        document.body.style.cursor = "grabbing";
+        document.body.classList.add('dragging-active');
+
+        // Добавляем звук (опционально, если есть доступ к методу класса, но тут мы изолированы. 
+        // Можно передать callback, но пока опустим)
+
+        document.addEventListener('mousemove', this.onDragMove);
+        document.addEventListener('mouseup', this.onDragEnd);
+        document.addEventListener('touchmove', this.onDragMove, { passive: false });
+        document.addEventListener('touchend', this.onDragEnd);
+    }
+
+    onDragMove(e) {
+        if (!this.isDragging) return;
+
+        // Для карт можно предотвратить дефолт, чтобы не скроллило страницу на мобилках
+        if (e.type === 'touchmove') e.preventDefault();
+
+        let clientX, clientY;
+        if (e.type === 'touchmove') {
+            clientX = e.touches[0].clientX;
+            clientY = e.touches[0].clientY;
+        } else {
+            clientX = e.clientX;
+            clientY = e.clientY;
+        }
+
+        const dx = clientX - this.startClientX;
+        const dy = clientY - this.startClientY;
+
+        // ЛОГИКА: Мы хотим, чтобы карта следовала за мышью, но начинала движение 
+        // из своего положения в веере. 
+        // Самый простой способ: мы заменяем transform веера на transform движения.
+        // Чтобы это выглядело красиво, мы убираем поворот (rotate 0) и немного увеличиваем (scale 1.1).
+
+        // transform: translate(${dx}px, ${dy}px)
+        // Но нам нужно учесть, что начальная позиция была смещена через margin-left в потоке + transform.
+        // Здесь мы просто накладываем смещение относительно точки старта.
+
+        // Важно: так как margin-left остается, элемент сдвигается от своего места в потоке.
+        // Если у элемента был transform: rotate(...), мы его перезаписываем.
+        // Это может вызвать визуальный "скачок" поворота, но это нормально для эффекта "взял карту".
+
+        this.el.style.transform = `translate3d(${dx}px, ${dy}px, 0) rotate(0deg) scale(1.1)`;
+        this.el.style.zIndex = 9999; // Поверх всего
+    }
+
+    onDragEnd(e) {
+        if (!this.isDragging) return;
+        this.isDragging = false;
+
+        document.body.style.cursor = "default";
+        document.body.classList.remove('dragging-active');
+        this.el.classList.remove('dragging');
+        this.el.style.zIndex = '';
+
+        document.removeEventListener('mousemove', this.onDragMove);
+        document.removeEventListener('mouseup', this.onDragEnd);
+        document.removeEventListener('touchmove', this.onDragMove);
+        document.removeEventListener('touchend', this.onDragEnd);
+
+        // Определяем, куда бросили.
+        // Считаем дельту от старта.
+        let clientY;
+        if (e.type === 'touchend') {
+            clientY = e.changedTouches[0].clientY;
+        } else {
+            clientY = e.clientY;
+        }
+
+        const totalDy = clientY - this.startClientY;
+
+        // Если карту потянули вверх более чем на 100px - считаем это использованием ("бросок на стол")
+        if (totalDy < -100) {
+            if (this.onDropToPlay) this.onDropToPlay();
+            // Сбрасываем стиль, чтобы она вернулась визуально, или можно оставить анимацию улетания
+            this.el.style.transform = '';
+            if (this.onReturnToHand) this.onReturnToHand();
+        } else {
+            // Если просто немного подвигали - возвращаем в руку
+            this.el.style.transform = ''; // Сброс трансформа, чтобы CSS/JS веера подхватил
+            if (this.onReturnToHand) this.onReturnToHand();
+        }
     }
 }
 
