@@ -107,6 +107,66 @@ export class HandManager {
         return false;
     }
 
+    // --- Helpers ---
+
+    static _getDamageFormula(item) {
+        if (!item.system.attack?.damage?.parts) return "";
+
+        const parts = [];
+        for (const part of item.system.attack.damage.parts) {
+            const { value } = part;
+            // Use system logic or fallback
+            // Replicating Daggerheart's DHActionDiceData.getFormula logic roughly if needed,
+            // but since we have the item, we might be able to rely on its data if it's prepared.
+
+            // However, the `value` in `parts` is a DataModel instance in the system. 
+            // If `item` is a proper system document, `value.getFormula()` should work.
+            // But let's be safe and replicate the formula construction if accessors aren't available 
+            // or if we want to be sure.
+
+            let formula = "";
+            if (value.custom?.enabled) {
+                formula = value.custom.formula;
+            } else {
+                const multiplier = value.multiplier === 'flat' ? value.flatMultiplier : `@${value.multiplier}`;
+                // Handle bonus sign
+                const bonus = value.bonus ? (value.bonus < 0 ? ` - ${Math.abs(value.bonus)}` : ` + ${value.bonus}`) : '';
+                formula = `${multiplier ?? 1}${value.dice}${bonus}`;
+            }
+
+            // Replace data
+            const rollData = item.actor?.getRollData() ?? {};
+            if (Roll.replaceFormulaData) {
+                formula = Roll.replaceFormulaData(formula, rollData);
+            }
+            parts.push(formula);
+        }
+
+        return parts.join(" + ");
+    }
+
+    static _getDamageLabels(item) {
+        if (!item.system.attack?.damage?.parts) return "";
+
+        const uniqueTypes = new Set();
+        for (const part of item.system.attack.damage.parts) {
+            if (part.type) {
+                const types = part.type instanceof Set ? part.type : (Array.isArray(part.type) ? part.type : [part.type]);
+                types.forEach(t => uniqueTypes.add(t));
+            }
+        }
+
+        const labels = [];
+        for (const type of uniqueTypes) {
+            const config = CONFIG.DH?.GENERAL?.damageTypes?.[type];
+            if (config?.label) {
+                labels.push(game.i18n.localize(config.label));
+            }
+        }
+
+        return labels.join(" / ");
+    }
+
     // --- UI ---
 
     static createHandPanel() {
@@ -305,6 +365,21 @@ export class HandManager {
 
         const showStress = costValue !== '';
 
+        // Damage Info
+        let damageHtml = "";
+        if (item.type === 'weapon') {
+            const damageFormula = this._getDamageFormula(item);
+            const damageLabels = this._getDamageLabels(item);
+            if (damageFormula) {
+                damageHtml = `
+                    <div class="damage-info">
+                        <span class="damage-formula">${damageFormula}</span>
+                        <span class="damage-labels">${damageLabels}</span>
+                    </div>
+                `;
+            }
+        }
+
         const html = `
             <div class="dh-card" data-item-id="${item.id}" data-type="${item.type}">
                 <div class="dh-card-scaler">
@@ -318,6 +393,7 @@ export class HandManager {
                          <p class="title">${item.name}</p>
                     </div>
                     <div class="card-text-content">
+                        ${damageHtml}
                         <div class="description" style="font-size: ${fontSize}px;">${plainDesc}</div>
                     </div>
                 </div>

@@ -314,6 +314,39 @@ export const injectStyles = () => {
     margin-bottom: 80px;
     pointer-events: all;
   }
+
+  .damage-info {
+    position: relative;
+    z-index: 7;
+    background: transparent;
+    color: #333;
+    padding: 0 0 8px 0;
+    font-size: 16px;
+    font-weight: 800;
+    font-family: var(--dh-font-header);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0px;
+    width: 100%;
+    box-sizing: border-box;
+    border-bottom: 2px solid #eee;
+    margin-bottom: 8px;
+    margin-top: 30px; /* Clear the title */
+  }
+
+  .damage-info + .description {
+    margin-top: 0 !important;
+  }
+
+  .damage-labels {
+    font-size: 15px;
+    text-transform: uppercase;
+    color: #666;
+    letter-spacing: 0.5px;
+    margin-top: 2px;
+  }
   `;
 
   const style = document.createElement('style');
