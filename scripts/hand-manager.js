@@ -8,6 +8,7 @@ import { injectStyles } from './styles.js';
 export class HandManager {
     static MODULE_NAME = 'happytreedice-daggerheart-card-hand';
 
+    static SETTING_ENABLED = 'handEnabled';
     static SETTING_ARC_ANGLE = 'arcAngle';
     static SETTING_FILTER_EQUIPPED = 'filterEquipped';
     static SETTING_SCALE = 'handScale';
@@ -26,7 +27,7 @@ export class HandManager {
     static DOMAIN_COLORS = {
         blade: '#a31e21',    // Red
         bone: '#5e5e5e',     // Grey
-        codex: '#d4a017',    // Gold/Yellow
+        codex: '#1a2c4f',    // Blue
         grace: '#c23b8f',    // Pink/Magenta
         midnight: '#1a1a2e', // Dark Blue
         sage: '#2e8b57',     // Green
@@ -41,7 +42,34 @@ export class HandManager {
         injectStyles();
     }
 
+    static getSetting(key) {
+        try {
+            return game.settings.get(this.MODULE_NAME, key);
+        } catch (e) {
+            // Fallback values if settings are not registered or module ID mismatch
+            const defaults = {
+                [this.SETTING_ENABLED]: true,
+                [this.SETTING_ARC_ANGLE]: 10,
+                [this.SETTING_FILTER_EQUIPPED]: true,
+                [this.SETTING_SCALE]: 1.0,
+                [this.SETTING_WIDTH]: 800
+            };
+            return defaults[key];
+        }
+    }
+
     static registerSettings() {
+
+        game.settings.register(this.MODULE_NAME, this.SETTING_ENABLED, {
+            name: this.translate("SETTINGS.ENABLED_NAME"),
+            hint: this.translate("SETTINGS.ENABLED_HINT"),
+            scope: "client",
+            config: true,
+            type: Boolean,
+            default: true,
+            onChange: (enabled) => this.refreshHand()
+        });
+
         game.settings.register(this.MODULE_NAME, this.SETTING_ARC_ANGLE, {
             name: this.translate("SETTINGS.ARC_ANGLE_NAME"),
             hint: this.translate("SETTINGS.ARC_ANGLE_HINT"),
@@ -204,6 +232,21 @@ export class HandManager {
         this._dndInstance = new SmoothDnD('#daggerheart-hand', '#dh-hand-drag-target', (newLeft) => {
             this.savePosition(newLeft);
         });
+
+        const isEnabled = this.getSetting(this.SETTING_ENABLED);
+
+        if (!isEnabled) {
+            this._$panel.addClass('hidden'); // Скрываем всю панель
+            return;
+        }
+
+        const controlled = canvas.tokens?.controlled || [];
+
+        if (controlled.length === 0) {
+            this._$panel.addClass('hidden');
+            this._currentActor = null; // Сбрасываем текущего актера
+            return;
+        }
     }
 
     static toggleHand() {
@@ -226,8 +269,8 @@ export class HandManager {
     static applyStyles() {
         if (!this._$panel) return;
 
-        const scale = game.settings.get(this.MODULE_NAME, this.SETTING_SCALE);
-        const width = Math.max(600, game.settings.get(this.MODULE_NAME, this.SETTING_WIDTH));
+        const scale = this.getSetting(this.SETTING_SCALE);
+        const width = Math.max(600, this.getSetting(this.SETTING_WIDTH));
         const $wrapper = this._$panel.find('.hand-wrapper');
 
         $wrapper.css({
@@ -240,11 +283,28 @@ export class HandManager {
     }
 
     static async savePosition(left) {
-        await game.user.setFlag(this.MODULE_NAME, 'handPosition', { left });
+
+        if (!game.modules.get(this.MODULE_NAME)?.active) return;
+
+        try {
+            await game.user.setFlag(this.MODULE_NAME, 'handPosition', { left });
+        } catch (e) {
+            console.warn("Quick Items Daggerheart | Failed to save position:", e);
+        }
     }
 
     static restorePosition() {
-        const pos = game.user.getFlag(this.MODULE_NAME, 'handPosition');
+
+        if (!game.modules.get(this.MODULE_NAME)?.active) return;
+
+        let pos;
+        try {
+            pos = game.user.getFlag(this.MODULE_NAME, 'handPosition');
+        } catch (e) {
+            console.warn("Quick Items Daggerheart | Failed to read flags:", e);
+            return;
+        }
+
         if (pos && pos.left !== undefined) {
             if (!this._$panel) this._$panel = $('#daggerheart-hand');
 
@@ -266,13 +326,26 @@ export class HandManager {
     }
 
     static refreshHand() {
-        if (!this._$panel) this.createHandPanel();
+
+        const isEnabled = this.getSetting(this.SETTING_ENABLED);
+        if (!isEnabled) {
+            this._$panel.addClass('hidden');
+            return;
+        }
+
+        const controlled = canvas.tokens?.controlled || [];
+        if (controlled.length === 0) {
+            this._$panel.addClass('hidden');
+            this._currentActor = null;
+            return;
+        } else {
+            this._$panel.removeClass('hidden');
+        }
 
         const $container = this._$container;
         $container.empty();
 
-        const controlled = canvas.tokens?.controlled || [];
-        let actor = controlled.length > 0 ? controlled[0].actor : game.user.character;
+        let actor = controlled[0].actor;
         this._currentActor = actor;
 
         if (!actor) {
@@ -281,7 +354,8 @@ export class HandManager {
         }
 
         const allItems = actor.items ? Array.from(actor.items) : [];
-        const showEquippedOnly = game.settings.get(this.MODULE_NAME, this.SETTING_FILTER_EQUIPPED);
+
+        const showEquippedOnly = this.getSetting(this.SETTING_FILTER_EQUIPPED);
 
         const cards = allItems.filter(item => {
             if (['class', 'subclass', 'race', 'ancestry', 'community'].includes(item.type)) return false;
@@ -296,6 +370,8 @@ export class HandManager {
                 if (item.system?.hasOwnProperty('equipped') && item.system.equipped == false) return false;
                 if (isDomain && item.system.inVault == true) return false;
             }
+
+            if (item.system?.hasOwnProperty('isItemAvailable') && item.system.isItemAvailable == false) return false;
 
             return true;
         });
@@ -418,7 +494,7 @@ export class HandManager {
         const count = cards.length;
         if (count === 0) return;
 
-        const maxAngle = game.settings.get(this.MODULE_NAME, this.SETTING_ARC_ANGLE);
+        const maxAngle = this.getSetting(this.SETTING_ARC_ANGLE);
         const wrapperWidth = this._$panel.find('.hand-wrapper').width();
         const cardWidth = 160;
         const availableSpace = wrapperWidth - 40;

@@ -43,7 +43,7 @@
         }
     ],
     "manifest": "https://raw.githubusercontent.com/Happytreedice/happytreedice-daggerheart-card-hand/refs/heads/master/module.json",
-    "download": "https://github.com/Happytreedice/happytreedice-daggerheart-card-hand/releases/download/1.0.2/happytreedice-daggerheart-card-hand.zip",
+    "download": "https://github.com/Happytreedice/happytreedice-daggerheart-card-hand/releases/download/1.0.3/happytreedice-daggerheart-card-hand.zip",
     "description": "",
     "flags": {},
     "esmodules": [

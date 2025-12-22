@@ -14,7 +14,9 @@
             "SCALE_NAME": "Interface Scale",
             "SCALE_HINT": "Module size multiplier (0.5 - 2.0).",
             "WIDTH_NAME": "Panel Width (px)",
-            "WIDTH_HINT": "Fixed width of the card panel (min 600)."
+            "WIDTH_HINT": "Fixed width of the card panel (min 600).",
+            "ENABLED_NAME":"Enable Card Hand",
+            "ENABLED_HINT":"Show the card hand interface on the screen."
         },
         "TOOLTIPS": {
             "DRAG": "Drag (X)",

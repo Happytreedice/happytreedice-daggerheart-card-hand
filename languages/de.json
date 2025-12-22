@@ -14,7 +14,9 @@
             "SCALE_NAME": "Interface-Skalierung",
             "SCALE_HINT": "Größenmultiplikator des Moduls (0.5 - 2.0).",
             "WIDTH_NAME": "Panelbreite (px)",
-            "WIDTH_HINT": "Feste Breite des Kartenpanels (min 600)."
+            "WIDTH_HINT": "Feste Breite des Kartenpanels (min 600).",
+            "ENABLED_NAME": "Kartenhand aktivieren",
+            "ENABLED_HINT": "Zeigen Sie die Kartenhand-Oberfläche auf dem Bildschirm an."
         },
         "TOOLTIPS": {
             "DRAG": "Ziehen (X)",
