@@ -35,6 +35,11 @@
             "lang": "en",
             "name": "English",
             "path": "languages/en.json"
+        },
+        {
+            "lang": "de",
+            "name": "German",
+            "path": "languages/de.json"
         }
     ],
     "manifest": "https://raw.githubusercontent.com/Happytreedice/happytreedice-daggerheart-card-hand/refs/heads/master/module.json",

@@ -1,0 +1,62 @@
+{
+    "QUICK_ITEMS": {
+        "TITLE": "Kartenhand",
+        "NO_ACTOR": "Wähle einen Akteur, um Gegenstände anzuzeigen",
+        "NO_ACCESS": "Kein Zugriff auf die Gegenstände dieses Akteurs",
+        "NO_ITEMS": "Akteur hat keine Gegenstände",
+        "REFRESH": "Hand aktualisieren",
+        "TOGGLE_TOOL": "Daggerheart Karten",
+        "SETTINGS": {
+            "ARC_ANGLE_NAME": "Kartenbogenwinkel",
+            "ARC_ANGLE_HINT": "Maximaler Fächerwinkel. 0 = gerade Linie.",
+            "FILTER_EQUIPPED_NAME": "Nur ausgerüstete anzeigen",
+            "FILTER_EQUIPPED_HINT": "Verbirgt Gegenstände, die nicht ausgerüstet sind.",
+            "SCALE_NAME": "Interface-Skalierung",
+            "SCALE_HINT": "Größenmultiplikator des Moduls (0.5 - 2.0).",
+            "WIDTH_NAME": "Panelbreite (px)",
+            "WIDTH_HINT": "Feste Breite des Kartenpanels (min 600)."
+        },
+        "TOOLTIPS": {
+            "DRAG": "Ziehen (X)",
+            "TOGGLE": "Einklappen/Ausklappen"
+        },
+        "SEARCH_PLACEHOLDER": "In Hand suchen...",
+        "FILTER_ALL": "Alle Karten",
+        "FILTER_WEAPON": "Waffen",
+        "FILTER_EQUIPMENT": "Ausrüstung",
+        "FILTER_CONSUMABLE": "Verbrauchsgegenstände",
+        "FILTER_TOOL": "Werkzeuge",
+        "FILTER_LOOT": "Beute",
+        "FILTER_ARMOR": "Rüstung",
+        "FILTER_SPELL": "Zauber",
+        "CARD_TYPES": {
+            "WEAPON": "Waffe",
+            "EQUIPMENT": "Ausrüstung",
+            "CONSUMABLE": "Verbrauchsgegenstand",
+            "TOOL": "Werkzeug",
+            "LOOT": "Beute",
+            "ARMOR": "Rüstung",
+            "SPELL": "Zauber"
+        },
+        "CONTEXT_MENU": {
+            "USE": "Benutzen",
+            "EDIT": "Bearbeiten",
+            "DELETE": "Löschen"
+        },
+        "PREVIEW": {
+            "USE_BUTTON": "Benutzen",
+            "EDIT_BUTTON": "Bearbeiten"
+        },
+        "DELETE_CONFIRM": {
+            "TITLE": "Gegenstand löschen",
+            "CONTENT": "Bist du sicher, dass du \"{name}\" löschen möchtest?",
+            "SUCCESS": "Gegenstand \"{name}\" gelöscht"
+        },
+        "NOTIFICATIONS": {
+            "EQUIPPED": "Gegenstand \"{name}\" ausgerüstet",
+            "UNEQUIPPED": "Gegenstand \"{name}\" abgelegt",
+            "USE_ERROR": "Fehler beim Benutzen des Gegenstands",
+            "DELETE_ERROR": "Fehler beim Löschen des Gegenstands"
+        }
+    }
+}
