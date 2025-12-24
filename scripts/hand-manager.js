@@ -418,6 +418,13 @@ export class HandManager {
             return;
         }
 
+        // Ensure only the active template injects its styles and any observers
+        try {
+            if (typeof template.attachStyles === 'function') template.attachStyles();
+        } catch (e) {
+            console.warn('Quick Items Daggerheart | Failed to attach template styles:', e);
+        }
+
         const html = template.renderPanel({ dragTitle, noActorText });
 
         $('body').append(html);
@@ -471,6 +478,11 @@ export class HandManager {
         const scale = this.getSetting(this.SETTING_SCALE);
         const width = Math.max(600, this.getSetting(this.SETTING_WIDTH));
         const $wrapper = this._$panel.find('.hand-wrapper');
+
+        // Apply configurable bottom padding for the cards container
+        const bottom = Number(this.getSetting(this.SETTING_BOTTOM)) || 0;
+        const $container = this._$panel.find('.dh-cards-container');
+        $container.css({ 'padding-bottom': `${bottom}px` });
 
         $wrapper.css({
             'transform': `scale(${scale})`,
@@ -576,7 +588,11 @@ export class HandManager {
             return true;
         });
 
-        if (cards.length === 0) {
+        // Detect adversary actors and prepare a synthetic standard-attack card if needed
+        const isAdversary = (actor.type === 'adversary') || (actor.system?.isAdversary) || (actor.system?.adversary);
+        const adversaryStandard = isAdversary ? this._createAdversaryStandardAttack(actor) : null;
+
+        if (cards.length === 0 && !adversaryStandard) {
             $container.append(`<div class="no-cards">${this.translate('NO_ITEMS')}</div>`);
             return;
         }
@@ -594,6 +610,13 @@ export class HandManager {
         const template = this.currentTemplate;
 
         const fragment = document.createDocumentFragment();
+
+        // If we built a synthetic adversary attack, add it first
+        if (adversaryStandard) {
+            const el = this.createCardElement(adversaryStandard, template);
+            fragment.appendChild(el[0]);
+        }
+
         cards.forEach(item => {
             const el = this.createCardElement(item, template);
             fragment.appendChild(el[0]);
@@ -655,6 +678,13 @@ export class HandManager {
 
             const style = element.style;
 
+            // Temporarily disable transition so the card doesn't animate from the
+            // default (0deg) to the target rotation when the DOM is rebuilt.
+            // We'll restore the transition in the next animation frame so
+            // subsequent interactions still animate smoothly.
+            const prevTransition = element.style.transition;
+            element.style.transition = 'none';
+
             style.marginLeft = index > 0 ? `${marginLeft}px` : '0px';
             style.zIndex = index + 1;
             style.bottom = '0px';
@@ -667,6 +697,14 @@ export class HandManager {
                 const yOffset = Math.abs(distFromCenter) * 5;
                 style.transform = `rotate(${rotation}deg) translateY(${yOffset}px)`;
             }
+
+            // Restore transition in the next frame so future transform changes animate.
+            (function(el, original) {
+                requestAnimationFrame(() => {
+                    // Only clear the inline override if it wasn't modified elsewhere.
+                    if (el && el.style) el.style.transition = original || '';
+                });
+            })(element, prevTransition);
         });
     }
 
