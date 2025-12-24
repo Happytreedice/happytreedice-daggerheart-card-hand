@@ -14,6 +14,7 @@ export class HandManager {
     static SETTING_FILTER_EQUIPPED = 'filterEquipped';
     static SETTING_SCALE = 'handScale';
     static SETTING_WIDTH = 'handWidthPx';
+    static SETTING_BOTTOM = 'bottom';
 
     static _currentActor = null;
     static _isCollapsed = false;
@@ -35,7 +36,8 @@ export class HandManager {
                 [this.SETTING_ARC_ANGLE]: 10,
                 [this.SETTING_FILTER_EQUIPPED]: true,
                 [this.SETTING_SCALE]: 1.0,
-                [this.SETTING_WIDTH]: 800
+                [this.SETTING_WIDTH]: 800,
+                [this.SETTING_BOTTOM]: 15
             };
             return defaults[key];
         }
