@@ -207,6 +207,191 @@ export class HandManager {
         return labels.join(" / ");
     }
 
+    /**
+     * Форматирует описание карточки: удаляет простые директивы и заменяет
+     * ссылки формата `@Something[...] {Label}` на жирную метку `<strong>Label</strong>`.
+     * Возвращает HTML-строку, готовую для вставки в DOM (метки экранируются).
+     * @param {string} desc
+     * @returns {string}
+     */
+    static formatDescription(desc) {
+        let descHtml = desc || '';
+        // Remove simple @Template[...] directives
+        descHtml = descHtml.replace(/@Template\[[^\]]*\]/g, '');
+        // Replace patterns like @Something[...]{Label} -> <strong>Label</strong>
+        descHtml = descHtml.replace(/@[^\[]*\[[^\]]*\]\{([^}]*)\}/g, (m, label) => {
+            const escaped = String(label).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            return `<strong>${escaped}</strong>`;
+        });
+        return descHtml;
+    }
+
+    /**
+     * Форматирует и локализует данные по дальности атаки/оружия.
+     * Поддерживает строки и объекты вида {type, value} или {range, distance}.
+     * Возвращает локализованную строку вида "<RangeLabel>: <TranslatedType> <value>" или пустую строку.
+     * @param {any} range
+     * @returns {string}
+     */
+    static formatRange(range) {
+        if (!range && range !== 0) return '';
+        const i18n = (typeof game !== 'undefined' && game.i18n) ? game.i18n : null;
+        const rangeLabel = i18n && i18n.has('DAGGERHEART.GENERAL.range') ? i18n.localize('DAGGERHEART.GENERAL.range') : 'Range';
+
+        let type = '';
+        let value = '';
+
+        if (typeof range === 'object') {
+            type = range.type || range.rangeType || range.mode || '';
+            value = range.value ?? range.distance ?? range.range ?? '';
+        } else if (typeof range === 'string') {
+            // If it's a single word, treat as a type; otherwise as a raw value (e.g. "10 ft")
+            if (/^[a-zA-Z_]+$/.test(range)) type = range;
+            else value = range;
+        } else {
+            value = String(range);
+        }
+
+        let translatedType = '';
+        if (type) {
+            const key = `DAGGERHEART.CONFIG.Range.${type}.short`;
+            if (i18n && i18n.has(key)) translatedType = i18n.localize(key);
+            else translatedType = type;
+        }
+
+        const parts = [];
+        if (translatedType) parts.push(translatedType);
+        if (value !== null && value !== undefined && String(value) !== '') parts.push(String(value));
+
+        if (parts.length === 0) return '';
+        return `${rangeLabel}: ${parts.join(' ')}`;
+    }
+
+    /**
+     * Создаёт синтетическую карту стандартной атаки для противника (adversary).
+     * Возвращает объект, совместимый с `createCardElement` и шаблоном.
+     * @param {Actor} actor
+     */
+    static _createAdversaryStandardAttack(actor) {
+        if (!actor) return null;
+
+        // Не добавляем, если у актора уже есть явно названная стандартная атака
+        const existing = actor.items?.find?.(i => i.name && i.name.toLowerCase().includes('standard attack'));
+        if (existing) return null;
+
+        const id = `adv-std-${actor.id}`;
+
+        // Попробуем взять данные атаки из actor.system.attack, если есть
+        const atk = actor.system?.attack || actor.system?.actions || null;
+
+        const atkName = atk?.name || 'Standard Attack';
+        const img = atk?.img || 'icons/svg/sword.svg';
+
+        // Damage parts: если в данных актора есть parts, используем их, иначе дефолт
+        const parts = (atk && atk.damage && atk.damage.parts) ? atk.damage.parts : [
+            {
+                value: {
+                    custom: { enabled: false, formula: '' },
+                    multiplier: 'flat',
+                    flatMultiplier: 1,
+                    dice: 'd6',
+                    bonus: 0
+                },
+                applyTo: 'hitPoints',
+                type: ['physical']
+            }
+        ];
+
+        const synthetic = {
+            id,
+            name: atkName,
+            type: 'weapon',
+            img,
+            actor,
+            system: {
+                description: { value: ' ' },
+                domain: 'default',
+                level: '',
+                recallCost: 0,
+                stress: 0,
+                attack: {
+                    // preserve roll data if present
+                    roll: atk?.roll || (actor.system?.attack?.roll ?? {}),
+                    damage: {
+                        parts,
+                        includeBase: atk?.damage?.includeBase ?? false,
+                        direct: atk?.damage?.direct ?? false
+                    },
+                    type: atk?.type || 'attack',
+                    range: atk?.range || ''
+                }
+            }
+        };
+
+        // Добавляем метод roll, чтобы HandManager.useItem мог его вызвать
+        synthetic.roll = async function (event) {
+            const item = this;
+            const actor = item.actor;
+            const speaker = ChatMessage.getSpeaker({ actor });
+
+            // Try to invoke the system-provided attack if available (matches sheet button behavior)
+            try {
+                const sysAttack = actor.system?.attack;
+                if (sysAttack && typeof sysAttack.use === 'function') {
+                    // Call with null event to mimic sheet button
+                    try {
+                        const res = sysAttack.use({});
+                        if (res instanceof Promise) await res;
+                        return;
+                    } catch (inner) {
+                        // If call fails, fall back to manual rolling below
+                        console.warn('Adversary synthetic attack: actor.system.attack.use failed, falling back', inner);
+                    }
+                }
+            } catch (e) {
+                // ignore and continue to manual roll
+            }
+
+            // 1) Attack roll (use d20, with possible advantage/disadvantage)
+            try {
+                const rollData = actor.getRollData ? actor.getRollData() : {};
+                const atkRollData = item.system.attack.roll || {};
+
+                // Determine d20 expression (support advantage/disadvantage)
+                let atkDiceExpr = '1d20';
+                const advState = atkRollData.advState || atkRollData.advantage || 'neutral';
+                if (advState === 'adv' || advState === 'advantage') atkDiceExpr = '2d20kh1';
+                if (advState === 'dis' || advState === 'disadvantage') atkDiceExpr = '2d20kl1';
+
+                const atkBonusOwn = (typeof atkRollData.bonus === 'number') ? atkRollData.bonus : (atkRollData.bonus ?? 0);
+                const atkBonusActor = actor.system?.bonuses?.roll?.attack?.bonus ?? 0;
+                const totalBonus = (Number(atkBonusOwn) || 0) + (Number(atkBonusActor) || 0);
+
+                const atkFormula = `${atkDiceExpr}${totalBonus ? ` + ${totalBonus}` : ''}`;
+
+                const atkRoll = await new Roll(atkFormula, rollData).evaluate({ async: true });
+                await atkRoll.toMessage({ speaker, flavor: `${item.name} — Attack Roll` });
+            } catch (e) {
+                console.warn('Adversary synthetic attack: failed attack roll', e);
+            }
+
+            // 2) Damage roll
+            try {
+                const damageFormula = HandManager._getDamageFormula(item);
+                if (damageFormula && damageFormula.trim() !== '') {
+                    const dmgRoll = await new Roll(damageFormula, actor.getRollData ? actor.getRollData() : {}).evaluate({ async: true });
+                    await dmgRoll.toMessage({ speaker, flavor: `${item.name} — Damage` });
+                } else {
+                    ChatMessage.create({ speaker, content: `${item.name}: No damage formula available.` });
+                }
+            } catch (e) {
+                console.warn('Adversary synthetic attack: failed damage roll', e);
+            }
+        };
+
+        return synthetic;
+    }
+
     // --- UI ---
 
     static get currentTemplate() {
