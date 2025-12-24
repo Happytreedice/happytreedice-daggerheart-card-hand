@@ -351,42 +351,6 @@ export class HandManager {
             } catch (e) {
                 // ignore and continue to manual roll
             }
-
-            // 1) Attack roll (use d20, with possible advantage/disadvantage)
-            try {
-                const rollData = actor.getRollData ? actor.getRollData() : {};
-                const atkRollData = item.system.attack.roll || {};
-
-                // Determine d20 expression (support advantage/disadvantage)
-                let atkDiceExpr = '1d20';
-                const advState = atkRollData.advState || atkRollData.advantage || 'neutral';
-                if (advState === 'adv' || advState === 'advantage') atkDiceExpr = '2d20kh1';
-                if (advState === 'dis' || advState === 'disadvantage') atkDiceExpr = '2d20kl1';
-
-                const atkBonusOwn = (typeof atkRollData.bonus === 'number') ? atkRollData.bonus : (atkRollData.bonus ?? 0);
-                const atkBonusActor = actor.system?.bonuses?.roll?.attack?.bonus ?? 0;
-                const totalBonus = (Number(atkBonusOwn) || 0) + (Number(atkBonusActor) || 0);
-
-                const atkFormula = `${atkDiceExpr}${totalBonus ? ` + ${totalBonus}` : ''}`;
-
-                const atkRoll = await new Roll(atkFormula, rollData).evaluate({ async: true });
-                await atkRoll.toMessage({ speaker, flavor: `${item.name} — Attack Roll` });
-            } catch (e) {
-                console.warn('Adversary synthetic attack: failed attack roll', e);
-            }
-
-            // 2) Damage roll
-            try {
-                const damageFormula = HandManager._getDamageFormula(item);
-                if (damageFormula && damageFormula.trim() !== '') {
-                    const dmgRoll = await new Roll(damageFormula, actor.getRollData ? actor.getRollData() : {}).evaluate({ async: true });
-                    await dmgRoll.toMessage({ speaker, flavor: `${item.name} — Damage` });
-                } else {
-                    ChatMessage.create({ speaker, content: `${item.name}: No damage formula available.` });
-                }
-            } catch (e) {
-                console.warn('Adversary synthetic attack: failed damage roll', e);
-            }
         };
 
         return synthetic;
