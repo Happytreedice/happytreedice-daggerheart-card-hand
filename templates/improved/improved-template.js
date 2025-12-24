@@ -129,17 +129,125 @@ const cssContent = `
     margin-top: 2px;
   }
   .damage-range {
-    font-size: 13px;
-    color: #444;
-    margin-top: 4px;
-    font-weight: 600;
+    font-size: 14px;
+    color: #222;
+    margin-top: 6px;
+    font-weight: 700;
   }
+  /* Improved card layout styles (no global positioning override) */
+
+  /* The card image is the background anchored to the top and fills width */
+  .dh-card-scaler .card-image-container {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    width: 100%;
+    height: auto;
+    overflow: hidden;
+    z-index: 1;
+    pointer-events: none;
+  }
+
+  .dh-card-scaler .card-main-image {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: top center;
+    display: block;
+    pointer-events: none;
+  }
+
+  /* Text content is anchored to the bottom and will expand upwards, overlapping the image */
+  .dh-card-scaler .card-text-content {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 6;
+    box-sizing: border-box;
+    padding: 24px 21.37px 21.37px;
+    background: rgba(255,255,255,0.98);
+    display: flex;
+    flex-direction: column;
+    justify-content: center; /* center vertically when there's spare space */
+    align-items: stretch;
+    min-height: 30%;
+    max-height: 100%;
+    overflow: visible;
+  }
+
+  .dh-card-scaler .card-text-content {
+    justify-content: flex-start;
+    padding-top: 0px; /* push title a bit down from the top of the text block */
+    padding-bottom: 8px;
+    min-height: 184px;
+  }
+
+  /* Make the divider/title layout flow with the text block (no absolute positioning that pins to the whole card) */
+  .dh-card-scaler .divider-container {
+    position: relative;
+    width: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 7;
+  }
+
+  .dh-card-scaler .title-bg {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%) skewX(-15deg);
+    width: 120%;
+    height: 42px;
+    border: 2px solid rgba(255, 255, 255, 0.4);
+    box-shadow: 0 3px 6px rgba(0, 0, 0, 0.6);
+    z-index: 7;
+  }
+
+  .dh-card-scaler .title {
+    position: relative;
+    top: 0;
+    transform: none;
+    left: 0;
+    width: 90%;
+    font-family: var(--dh-font-header);
+    font-weight: 800;
+    text-transform: uppercase;
+    font-size: 28px;
+    line-height: 1;
+    text-align: center;
+    color: #fff;
+    text-shadow: 0 2px 3px rgba(0, 0, 0, 0.8);
+    margin: 0;
+    z-index: 8;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .dh-card-scaler .description {
+    margin-top: 24px;
+    color: #000;
+    line-height: 1.3;
+    overflow: visible;
+    max-width: 100%;
+    word-break: break-word;
+    font-size: 16px !important;
+  }
+
+  .dh-card-scaler {
+    border: none;
+    border-radius: 16px;
+    background: none;
+    }
   `;
 
 function attachStyles() {
   // Remove any other template styles so only the active template's styles are present
   document.querySelectorAll('[id^="' + cssId + '"]').forEach(el => el.remove());
-  const id = `${cssId}-default`;
+  const id = `${cssId}-improved`;
   if (document.getElementById(id)) return;
   const style = document.createElement('style');
   style.id = id;
@@ -148,9 +256,9 @@ function attachStyles() {
   console.log('Quick Items Daggerheart | Styles injected (default)');
 }
 
-const DefaultTemplate = {
-  id: 'default',
-  name: 'Standard Daggerheart',
+const ImprovedTemplate = {
+  id: 'improved',
+  name: 'Improved Daggerheart',
   attachStyles,
 
   /**
@@ -232,7 +340,6 @@ const DefaultTemplate = {
     if (item.type === 'weapon') {
       const damageFormula = HandManager._getDamageFormula(item);
       const damageLabels = HandManager._getDamageLabels(item);
-      // Try common locations for range data
       const rangeRaw = item.system?.attack?.range || item.system?.range || '';
       const rangeText = HandManager.formatRange(rangeRaw);
       if (damageFormula) {
@@ -254,11 +361,11 @@ const DefaultTemplate = {
                 <div class="card-image-container">
                   <img class="card-main-image" src="${img}" draggable="false">
                 </div>
-                <div class="divider-container">
-                  <div class="title-bg" style="background-color: ${domainColor};"></div>
-                  <p class="title">${item.name}</p>
-                </div>
                 <div class="card-text-content">
+                    <div class="divider-container">
+                      <div class="title-bg" style="background-color: ${domainColor};"></div>
+                      <p class="title">${item.name}</p>
+                    </div>
                     ${damageHtml}
                     <div class="description" style="font-size: ${fontSize}px;">${plainDesc}</div>
                 </div>
@@ -266,6 +373,4 @@ const DefaultTemplate = {
     return html;
   }
 };
-
-// Саморегистрация при импорте
-registerTemplate(DefaultTemplate);
+registerTemplate(ImprovedTemplate);
