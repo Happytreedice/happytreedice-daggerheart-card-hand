@@ -107,6 +107,17 @@ export class HandManager {
             onChange: () => this.applyStyles()
         });
 
+        game.settings.register(this.MODULE_NAME, this.SETTING_BOTTOM, {
+            name: this.translate("SETTINGS.BOTTOM_NAME"),
+            hint: this.translate("SETTINGS.BOTTOM_HINT"),
+            scope: "client",
+            config: true,
+            type: Number,
+            default: 15,
+            range: { min: 0, max: 400, step: 1 },
+            onChange: () => this.applyStyles()
+        });
+
         game.settings.register(this.MODULE_NAME, this.SETTING_WIDTH, {
             name: this.translate("SETTINGS.WIDTH_NAME"),
             hint: this.translate("SETTINGS.WIDTH_HINT"),
