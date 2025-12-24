@@ -1,10 +1,8 @@
-import { HandManager } from './hand-manager.js';
 import { registerHooks } from './hooks.js';
-
+import '../templates/default/default-template.js';
 /**
  * Main Entry Point
  */
 Hooks.once('init', () => {
-    HandManager.init();
     registerHooks();
 });

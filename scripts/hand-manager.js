@@ -1,5 +1,5 @@
 import { SmoothDnD, CardSmoothDnD } from './dnd.js';
-import { injectStyles } from './styles.js';
+import { getTemplate, getTemplateChoices } from './registry.js';
 
 /**
  * Daggerheart Card Hand Manager
@@ -9,6 +9,7 @@ export class HandManager {
     static MODULE_NAME = 'happytreedice-daggerheart-card-hand';
 
     static SETTING_ENABLED = 'handEnabled';
+    static SETTING_TEMPLATE = 'cardTemplate';
     static SETTING_ARC_ANGLE = 'arcAngle';
     static SETTING_FILTER_EQUIPPED = 'filterEquipped';
     static SETTING_SCALE = 'handScale';
@@ -23,25 +24,6 @@ export class HandManager {
     static _$container = null;
     static _refreshDebounceTimer = null;
 
-    // Цвета для доменов (подложки названий)
-    static DOMAIN_COLORS = {
-        blade: '#a31e21',    // Red
-        bone: '#5e5e5e',     // Grey
-        codex: '#1a2c4f',    // Blue
-        grace: '#c23b8f',    // Pink/Magenta
-        midnight: '#1a1a2e', // Dark Blue
-        sage: '#2e8b57',     // Green
-        splendor: '#00bcd4', // Cyan/Teal
-        valor: '#e67e22',    // Orange
-        arcana: '#4b0082',   // Purple
-        default: '#3d3d3d'   // Dark Grey fallback
-    };
-
-    static init() {
-        console.log('Quick Items Daggerheart | Init Manager');
-        injectStyles();
-    }
-
     static getSetting(key) {
         try {
             return game.settings.get(this.MODULE_NAME, key);
@@ -49,6 +31,7 @@ export class HandManager {
             // Fallback values if settings are not registered or module ID mismatch
             const defaults = {
                 [this.SETTING_ENABLED]: true,
+                [this.SETTING_TEMPLATE]: 'default',
                 [this.SETTING_ARC_ANGLE]: 10,
                 [this.SETTING_FILTER_EQUIPPED]: true,
                 [this.SETTING_SCALE]: 1.0,
@@ -67,7 +50,27 @@ export class HandManager {
             config: true,
             type: Boolean,
             default: true,
-            onChange: (enabled) => this.refreshHand()
+            onChange: () => this.refreshHand()
+        });
+
+        const templateChoices = getTemplateChoices();
+
+        game.settings.register(this.MODULE_NAME, this.SETTING_TEMPLATE, {
+            name: this.translate("SETTINGS.TEMPLATE_NAME"),
+            hint: this.translate("SETTINGS.TEMPLATE_HINT"),
+            scope: "client",
+            config: true,
+            type: String,
+            default: "default",
+            choices: templateChoices,
+            onChange: () => {
+                if (this._$panel) {
+                    this._$panel.remove();
+                    this._$panel = null;
+                    this._$container = null;
+                }
+                this.refreshHand();
+            }
         });
 
         game.settings.register(this.MODULE_NAME, this.SETTING_ARC_ANGLE, {
@@ -115,10 +118,6 @@ export class HandManager {
                 this.applyCardFanLayout();
             }
         });
-    }
-
-    static loadTranslations() {
-        // Placeholder for future translation logic
     }
 
     static translate(key) {
@@ -197,6 +196,12 @@ export class HandManager {
 
     // --- UI ---
 
+    static get currentTemplate() {
+        const id = this.getSetting(this.SETTING_TEMPLATE);
+        // Fallback to 'default' if the selected template is missing
+        return getTemplate(id) || getTemplate('default');
+    }
+
     static createHandPanel() {
         // Optimization: Use cached selector if available
         if (this._$panel || document.getElementById('daggerheart-hand')) {
@@ -206,20 +211,16 @@ export class HandManager {
         }
 
         const dragTitle = this.translate("TOOLTIPS.DRAG");
+        const noActorText = this.translate('NO_ACTOR');
 
-        const html = `
-            <div id="daggerheart-hand">
-                <div class="hand-wrapper">
-                    <div class="hand-background-plate" id="dh-hand-drag-target">
-                        <div class="drag-handle-area" title="${dragTitle}"></div>
-                    </div>
-                    
-                    <div class="dh-cards-container">
-                        <div class="no-cards">${this.translate('NO_ACTOR')}</div>
-                    </div>
-                </div>
-            </div>
-        `;
+        // Получаем HTML панели из текущего шаблона
+        const template = this.currentTemplate;
+        if (!template) {
+            console.error("Quick Items Daggerheart | No template found!");
+            return;
+        }
+
+        const html = template.renderPanel({ dragTitle, noActorText });
 
         $('body').append(html);
 
@@ -326,6 +327,7 @@ export class HandManager {
     }
 
     static refreshHand() {
+        if (!this._$panel) this.createHandPanel();
 
         const isEnabled = this.getSetting(this.SETTING_ENABLED);
         if (!isEnabled) {
@@ -371,7 +373,7 @@ export class HandManager {
                 if (isDomain && item.system.inVault == true) return false;
             }
 
-            if (item.system?.hasOwnProperty('isItemAvailable') && item.system.isItemAvailable == false) return false;
+            if (actor.system.isItemAvailable(item) == false) return false;
 
             return true;
         });
@@ -390,9 +392,12 @@ export class HandManager {
             return typeScore(a.type) - typeScore(b.type) || a.name.localeCompare(b.name);
         });
 
+        // Получаем текущий шаблон
+        const template = this.currentTemplate;
+
         const fragment = document.createDocumentFragment();
         cards.forEach(item => {
-            const el = this.createCardElement(item);
+            const el = this.createCardElement(item, template);
             fragment.appendChild(el[0]);
         });
 
@@ -400,82 +405,16 @@ export class HandManager {
         this.applyCardFanLayout();
     }
 
-    static createCardElement(item) {
-        const img = item.img || 'icons/svg/item-bag.svg';
-        const desc = item.system.description?.value || item.system.description || "";
-
-        const tempDiv = document.createElement("div");
-        tempDiv.innerHTML = desc;
-        let plainDesc = tempDiv.textContent || tempDiv.innerText || "";
-
-        let fontSize = 24;
-        const textLength = plainDesc.length;
-        if (textLength > 160) {
-            const ratio = (textLength / 160) / 10;
-            fontSize = 18 - Math.round(18 * ratio);
-        }
-
-        let domainKey = "default";
-        if (item.system.domain) {
-            domainKey = item.system.domain.toLowerCase();
-        } else if (item.type === 'class') {
-            domainKey = item.name.toLowerCase();
-        }
-
-        // Выбираем цвет для подложки
-        const domainColor = this.DOMAIN_COLORS[domainKey] || this.DOMAIN_COLORS.default;
-
-        const bannerSrc = `modules/happytreedice-daggerheart-card-hand/assets/imgs/${domainKey}/banner.avif`;
-        const stressSrc = `modules/happytreedice-daggerheart-card-hand/assets/imgs/default/stress-cost.avif`;
-
-        const level = item.system.level || "";
-        const recallCost = item.system.recallCost;
-        const stressCost = item.system.stress;
-
-        let costValue = '';
-        if (recallCost !== null && recallCost !== undefined && recallCost !== 0) {
-            costValue = recallCost;
-        } else if (stressCost !== null && stressCost !== undefined && stressCost !== 0) {
-            costValue = stressCost;
-        }
-
-        const showStress = costValue !== '';
-
-        // Damage Info
-        let damageHtml = "";
-        if (item.type === 'weapon') {
-            const damageFormula = this._getDamageFormula(item);
-            const damageLabels = this._getDamageLabels(item);
-            if (damageFormula) {
-                damageHtml = `
-                    <div class="damage-info">
-                        <span class="damage-formula">${damageFormula}</span>
-                        <span class="damage-labels">${damageLabels}</span>
-                    </div>
-                `;
-            }
-        }
-
+    static createCardElement(item, template) {
+        // Используем функцию renderCard из выбранного шаблона
+        const tempHtml = template.renderCard(item);
         const html = `
             <div class="dh-card" data-item-id="${item.id}" data-type="${item.type}">
                 <div class="dh-card-scaler">
-                    ${level ? `<img class="card-banner_image" src="${bannerSrc}"><div class="card-level">${level}</div>` : ''}
-                    ${showStress ? `<img class="stress_image" src="${stressSrc}"><div class="stress_text">${costValue}</div>` : ''}
-                    <div class="card-image-container">
-                        <img class="card-main-image" src="${img}" draggable="false">
-                    </div>
-                    <div class="divider-container">
-                         <div class="title-bg" style="background-color: ${domainColor};"></div>
-                         <p class="title">${item.name}</p>
-                    </div>
-                    <div class="card-text-content">
-                        ${damageHtml}
-                        <div class="description" style="font-size: ${fontSize}px;">${plainDesc}</div>
-                    </div>
+                ${tempHtml}
                 </div>
             </div>
         `;
-
         const $el = $(html);
 
         new CardSmoothDnD($el[0], () => {

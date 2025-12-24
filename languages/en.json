@@ -16,7 +16,9 @@
             "WIDTH_NAME": "Panel Width (px)",
             "WIDTH_HINT": "Fixed width of the card panel (min 600).",
             "ENABLED_NAME":"Enable Card Hand",
-            "ENABLED_HINT":"Show the card hand interface on the screen."
+            "ENABLED_HINT":"Show the card hand interface on the screen.",
+            "TEMPLATE_NAME": "Card Template",
+            "TEMPLATE_HINT": "Choose the visual style of the cards."
         },
         "TOOLTIPS": {
             "DRAG": "Drag (X)",

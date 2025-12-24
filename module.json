@@ -1,7 +1,7 @@
 {
     "id": "happytreedice-daggerheart-card-hand",
     "title": "Happytreedice Daggerheart card hand",
-    "version": "1.0.3",
+    "version": "1.0.4",
     "compatibility": {
         "minimum": "13",
         "verified": "13",
@@ -43,9 +43,12 @@
         }
     ],
     "manifest": "https://raw.githubusercontent.com/Happytreedice/happytreedice-daggerheart-card-hand/refs/heads/master/module.json",
-    "download": "https://github.com/Happytreedice/happytreedice-daggerheart-card-hand/releases/download/1.0.3/happytreedice-daggerheart-card-hand.zip",
+    "download": "https://github.com/Happytreedice/happytreedice-daggerheart-card-hand/releases/download/1.0.4/happytreedice-daggerheart-card-hand.zip",
     "description": "",
     "flags": {},
+    "styles": [
+        "./styles/dnd.css"
+    ],
     "esmodules": [
         "./scripts/main.js"
     ]
