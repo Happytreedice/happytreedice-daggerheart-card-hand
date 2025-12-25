@@ -6,16 +6,28 @@ import { HandManager } from '../../scripts/hand-manager.js';
  */
 // Цвета для доменов (подложки названий)
 const DOMAIN_COLORS = {
-  blade: '#a31e21',    // Red
-  bone: '#5e5e5e',     // Grey
-  codex: '#00bcd4',    // Cyan/Teal
-  grace: '#c23b8f',    // Pink/Magenta
-  midnight: '#1a1a2e', // Dark Blue
-  sage: '#2e8b57',     // Green
-  splendor: '#d4a017', // Gold/Yellow
-  valor: '#e67e22',    // Orange
-  arcana: '#4b0082',   // Purple
+  blade: '#af231c',    // Red
+  bone: '#a4a9a8',     // Grey
+  codex: '#24395d',    // Cyan/Teal
+  grace: '#8d3965',    // Pink/Magenta
+  midnight: '#1e201f', // Dark Blue
+  sage: '#244e30',     // Green
+  splendor: '#f2d72f', // Gold/Yellow
+  valor: '#e2680e',    // Orange
+  arcana: '#4e345b',   // Purple
   default: '#3d3d3d'   // Dark Grey fallback
+};
+const DOMAIN_TEXT_COLORS = {
+  blade: '#fff',    // Red
+  bone: '#000',     // Grey
+  codex: '#fff',    // Cyan/Teal
+  grace: '#fff',    // Pink/Magenta
+  midnight: '#fff', // Dark Blue
+  sage: '#fff',     // Green
+  splendor: '#000', // Gold/Yellow
+  valor: '#fff',    // Orange
+  arcana: '#fff',   // Purple
+  default: '#fff'   // Dark Grey fallback
 };
 const cssId = 'daggerheart-hand-styles';
 
@@ -255,7 +267,7 @@ const cssContent = `
     line-height: 1;
     text-align: center;
     color: #000;
-    text-shadow: 0 2px 3px rgba(0, 0, 0, 0.8);
+    text-shadow: none;
     margin: 0;
     z-index: 8;
     white-space: nowrap;
@@ -277,7 +289,7 @@ const cssContent = `
     line-height: 1;
     text-align: center;
     color: #fff;
-    text-shadow: 0 2px 3px rgba(0, 0, 0, 0.8);
+    text-shadow: none;
     margin: 0;
     z-index: 8;
     white-space: nowrap;
@@ -322,6 +334,20 @@ const cssContent = `
     border-radius: 16px;
     background: none;
     }
+
+  .dh-card-scaler .card-level {
+    padding-right: 6px;
+    color: #fff;
+    filter: none;
+    text-shadow: none;
+  }
+
+  .dh-card-scaler .stress_text {
+    padding: 7px 2px 0px 3px;
+    font-size: 14px;
+    filter: none;
+    text-shadow: none;
+  }
   `;
 
 function attachStyles() {
@@ -415,6 +441,7 @@ const ImprovedTemplate = {
     
 
     const domainColor = DOMAIN_COLORS[domainKey] || DOMAIN_COLORS.default;
+    const domainFontColor = DOMAIN_TEXT_COLORS[domainKey] || DOMAIN_TEXT_COLORS.default;
 
     const bannerSrc = `modules/happytreedice-daggerheart-card-hand/templates/default/assets/imgs/${domainKey}/banner.avif`;
     const stressSrc = `modules/happytreedice-daggerheart-card-hand/templates/default/assets/imgs/default/stress-cost.avif`;
@@ -439,7 +466,7 @@ const ImprovedTemplate = {
     console.log('Improved Template | Rendering item:', item);
 
     const itemType = item.type || item.system.type || "ability";
-    const itemTypeLocalized = HandManager.formatItemType(itemType);
+    let itemTypeLocalized = HandManager.formatItemType(itemType);
 
     if (itemType === 'weapon') {
       const damageFormula = HandManager._getDamageFormula(item);
@@ -457,14 +484,13 @@ const ImprovedTemplate = {
       }
     }
 
-    let domainCardTypeHtml = "";
     if (item.system.domain) {
       const domainCardTypeText = HandManager.formatDomainCardType(domainCardType);
-      domainCardTypeHtml = `<p class="domain-card-type">${domainCardTypeText}</p>`;
+      itemTypeLocalized = domainCardTypeText;
     }
     // HTML Шаблон
     const html = `
-              ${level ? `<img class="card-banner_image" src="${bannerSrc}"><div class="card-level">${level}</div>` : ''}
+              ${level ? `<img class="card-banner_image" src="${bannerSrc}"><div class="card-level" style="color: ${domainFontColor};">${level}</div>` : ''}
               ${showStress ? `<img class="stress_image" src="${stressSrc}"><div class="stress_text">${costValue}</div>` : ''}
                 <div class="card-image-container">
                   <img class="card-main-image" src="${img}" draggable="false">
@@ -472,7 +498,7 @@ const ImprovedTemplate = {
                 <div class="card-text-content">
                     <div class="divider-container">
                       <div class="title-bg" style="--divider-url: url('${dividerSrc}'); --domain-color: ${domainColor};"><div class="title-bg-inner"></div></div>
-                      <p class="card-type">${itemTypeLocalized}</p>
+                      <p class="card-type" style="color: ${domainFontColor};">${itemTypeLocalized}</p>
                     </div>
                     <div class="card-title">${item.name}</div>
                     ${damageHtml}
