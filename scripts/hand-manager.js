@@ -423,6 +423,49 @@ export class HandManager {
             this.applyCardFanLayout();
         });
 
+        // Открыть описание предмета по ПКМ (контекстное меню) — как при выборе "Редактировать"
+        $el.on('contextmenu', async (ev) => {
+            try {
+                ev.preventDefault();
+                ev.stopPropagation();
+
+                // Если это реальный документ Item (Foundry), попробуем открыть его лист
+                if (item && typeof item.sheet === 'object' && typeof item.sheet.render === 'function') {
+                    item.sheet.render(true);
+                    return;
+                }
+
+                // Если предмет привязан к актору и документ можно получить через actor.items
+                if (item && item.actor && item.actor.items && typeof item.actor.items.get === 'function') {
+                    const found = item.actor.items.get(item.id);
+                    if (found && typeof found.sheet === 'object' && typeof found.sheet.render === 'function') {
+                        found.sheet.render(true);
+                        return;
+                    }
+                }
+
+                // Для синтетических карточек (например, атака противника) показываем простое модальное окно с описанием
+                const title = item?.name || "Item";
+                const desc = HandManager.formatDescription(item?.system?.description?.value || item?.system?.description || '');
+                const content = `<div class="dh-item-sheet-preview">${desc}</div>`;
+
+                // Используем Foundry Dialog, если доступен
+                if (typeof Dialog === 'function') {
+                    new Dialog({
+                        title,
+                        content,
+                        buttons: { close: { label: game.i18n?.localize?.('Close') || 'Close' } },
+                        default: 'close'
+                    }).render(true);
+                } else {
+                    alert(`${title}\n\n${desc.replace(/<[^>]*>?/gm, '')}`);
+                }
+
+            } catch (err) {
+                console.error('QuickItems | Failed to open item sheet on context menu', err);
+            }
+        });
+
         return $el;
     }
 
