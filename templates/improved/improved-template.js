@@ -470,8 +470,6 @@ const ImprovedTemplate = {
     // Damage Info
     let damageHtml = "";
 
-    console.log('Improved Template | Rendering item:', item);
-
     const itemType = item.type || item.system.type || "ability";
     let itemTypeLocalized = HandManager.formatItemType(itemType);
 
