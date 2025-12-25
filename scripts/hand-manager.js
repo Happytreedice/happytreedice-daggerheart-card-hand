@@ -14,6 +14,7 @@ export class HandManager {
     static SETTING_FILTER_EQUIPPED = 'filterEquipped';
     static SETTING_SCALE = 'handScale';
     static SETTING_WIDTH = 'handWidthPx';
+    static SETTING_BOTTOM = 'bottom';
 
     static _currentActor = null;
     static _isCollapsed = false;
@@ -35,7 +36,8 @@ export class HandManager {
                 [this.SETTING_ARC_ANGLE]: 10,
                 [this.SETTING_FILTER_EQUIPPED]: true,
                 [this.SETTING_SCALE]: 1.0,
-                [this.SETTING_WIDTH]: 800
+                [this.SETTING_WIDTH]: 800,
+                [this.SETTING_BOTTOM]: 15
             };
             return defaults[key];
         }
@@ -102,6 +104,17 @@ export class HandManager {
             type: Number,
             default: 1.0,
             range: { min: 0.5, max: 2.0, step: 0.1 },
+            onChange: () => this.applyStyles()
+        });
+
+        game.settings.register(this.MODULE_NAME, this.SETTING_BOTTOM, {
+            name: this.translate("SETTINGS.BOTTOM_NAME"),
+            hint: this.translate("SETTINGS.BOTTOM_HINT"),
+            scope: "client",
+            config: true,
+            type: Number,
+            default: 15,
+            range: { min: 0, max: 400, step: 1 },
             onChange: () => this.applyStyles()
         });
 
@@ -194,6 +207,197 @@ export class HandManager {
         return labels.join(" / ");
     }
 
+    /**
+     * Форматирует описание карточки: удаляет простые директивы и заменяет
+     * ссылки формата `@Something[...] {Label}` на жирную метку `<strong>Label</strong>`.
+     * Возвращает HTML-строку, готовую для вставки в DOM (метки экранируются).
+     * @param {string} desc
+     * @returns {string}
+     */
+    static formatDescription(desc) {
+        let descHtml = desc || '';
+        // Remove simple @Template[...] directives
+        descHtml = descHtml.replace(/@Template\[[^\]]*\]/g, '');
+        // Replace patterns like @Something[...]{Label} -> <strong>Label</strong>
+        descHtml = descHtml.replace(/@[^\[]*\[[^\]]*\]\{([^}]*)\}/g, (m, label) => {
+            const escaped = String(label).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            return `<strong>${escaped}</strong>`;
+        });
+        return descHtml;
+    }
+
+    /**
+     * Форматирует и локализует данные по дальности атаки/оружия.
+     * Поддерживает строки и объекты вида {type, value} или {range, distance}.
+     * Возвращает локализованную строку вида "<RangeLabel>: <TranslatedType> <value>" или пустую строку.
+     * @param {any} range
+     * @returns {string}
+     */
+    static formatRange(range) {
+        if (!range && range !== 0) return '';
+        const i18n = (typeof game !== 'undefined' && game.i18n) ? game.i18n : null;
+        const rangeLabel = i18n && i18n.has('DAGGERHEART.GENERAL.range') ? i18n.localize('DAGGERHEART.GENERAL.range') : 'Range';
+
+        let type = '';
+        let value = '';
+
+        if (typeof range === 'object') {
+            type = range.type || range.rangeType || range.mode || '';
+            value = range.value ?? range.distance ?? range.range ?? '';
+        } else if (typeof range === 'string') {
+            // If it's a single word, treat as a type; otherwise as a raw value (e.g. "10 ft")
+            if (/^[a-zA-Z_]+$/.test(range)) type = range;
+            else value = range;
+        } else {
+            value = String(range);
+        }
+
+        let translatedType = '';
+        if (type) {
+            const key = `DAGGERHEART.CONFIG.Range.${type}.short`;
+            if (i18n && i18n.has(key)) translatedType = i18n.localize(key);
+            else translatedType = type;
+        }
+
+        const parts = [];
+        if (translatedType) parts.push(translatedType);
+        if (value !== null && value !== undefined && String(value) !== '') parts.push(String(value));
+
+        if (parts.length === 0) return '';
+        return `${rangeLabel}: ${parts.join(' ')}`;
+    }
+
+    /**
+     * Форматирует и локализует данные по дальности атаки/оружия.
+     * Поддерживает строки и объекты вида {type, value} или {range, distance}.
+     * Возвращает локализованную строку вида "<RangeLabel>: <TranslatedType> <value>" или пустую строку.
+     * @param {any} range
+     * @returns {string}
+     */
+    static formatItemType(itemType) {
+        if (!itemType && itemType !== 0) return '';
+        const i18n = (typeof game !== 'undefined' && game.i18n) ? game.i18n : null;
+
+        let translatedType = '';
+        if (itemType) {
+            const key = `TYPES.Item.${itemType}`;
+            if (i18n && i18n.has(key)) translatedType = i18n.localize(key);
+            else translatedType = itemType;
+        }
+
+        return translatedType;
+    }
+
+    /**
+     * Форматирует и локализует данные по дальности атаки/оружия.
+     * Поддерживает строки и объекты вида {type, value} или {range, distance}.
+     * Возвращает локализованную строку вида "<RangeLabel>: <TranslatedType> <value>" или пустую строку.
+     * @param {any} range
+     * @returns {string}
+     */
+    static formatDomainCardType(domainCardType) {
+        if (!domainCardType && domainCardType !== 0) return '';
+        const i18n = (typeof game !== 'undefined' && game.i18n) ? game.i18n : null;
+
+        let translatedType = '';
+        if (domainCardType) {
+            const key = `DAGGERHEART.CONFIG.DomainCardTypes.${domainCardType}`;
+            if (i18n && i18n.has(key)) translatedType = i18n.localize(key);
+            else translatedType = domainCardType;
+        }
+
+        return translatedType;
+    }
+
+    /**
+     * Создаёт синтетическую карту стандартной атаки для противника (adversary).
+     * Возвращает объект, совместимый с `createCardElement` и шаблоном.
+     * @param {Actor} actor
+     */
+    static _createAdversaryStandardAttack(actor) {
+        if (!actor) return null;
+
+        // Не добавляем, если у актора уже есть явно названная стандартная атака
+        const existing = actor.items?.find?.(i => i.name && i.name.toLowerCase().includes('standard attack'));
+        if (existing) return null;
+
+        const id = `adv-std-${actor.id}`;
+
+        // Попробуем взять данные атаки из actor.system.attack, если есть
+        const atk = actor.system?.attack || actor.system?.actions || null;
+
+        const atkName = atk?.name || 'Standard Attack';
+        const img = atk?.img || 'icons/svg/sword.svg';
+
+        // Damage parts: если в данных актора есть parts, используем их, иначе дефолт
+        const parts = (atk && atk.damage && atk.damage.parts) ? atk.damage.parts : [
+            {
+                value: {
+                    custom: { enabled: false, formula: '' },
+                    multiplier: 'flat',
+                    flatMultiplier: 1,
+                    dice: 'd6',
+                    bonus: 0
+                },
+                applyTo: 'hitPoints',
+                type: ['physical']
+            }
+        ];
+
+        const synthetic = {
+            id,
+            name: atkName,
+            type: 'weapon',
+            img,
+            actor,
+            system: {
+                description: { value: ' ' },
+                domain: 'default',
+                level: '',
+                recallCost: 0,
+                stress: 0,
+                attack: {
+                    // preserve roll data if present
+                    roll: atk?.roll || (actor.system?.attack?.roll ?? {}),
+                    damage: {
+                        parts,
+                        includeBase: atk?.damage?.includeBase ?? false,
+                        direct: atk?.damage?.direct ?? false
+                    },
+                    type: atk?.type || 'attack',
+                    range: atk?.range || ''
+                }
+            }
+        };
+
+        // Добавляем метод roll, чтобы HandManager.useItem мог его вызвать
+        synthetic.roll = async function (event) {
+            const item = this;
+            const actor = item.actor;
+            const speaker = ChatMessage.getSpeaker({ actor });
+
+            // Try to invoke the system-provided attack if available (matches sheet button behavior)
+            try {
+                const sysAttack = actor.system?.attack;
+                if (sysAttack && typeof sysAttack.use === 'function') {
+                    // Call with null event to mimic sheet button
+                    try {
+                        const res = sysAttack.use({});
+                        if (res instanceof Promise) await res;
+                        return;
+                    } catch (inner) {
+                        // If call fails, fall back to manual rolling below
+                        console.warn('Adversary synthetic attack: actor.system.attack.use failed, falling back', inner);
+                    }
+                }
+            } catch (e) {
+                // ignore and continue to manual roll
+            }
+        };
+
+        return synthetic;
+    }
+
     // --- UI ---
 
     static get currentTemplate() {
@@ -218,6 +422,13 @@ export class HandManager {
         if (!template) {
             console.error("Quick Items Daggerheart | No template found!");
             return;
+        }
+
+        // Ensure only the active template injects its styles and any observers
+        try {
+            if (typeof template.attachStyles === 'function') template.attachStyles();
+        } catch (e) {
+            console.warn('Quick Items Daggerheart | Failed to attach template styles:', e);
         }
 
         const html = template.renderPanel({ dragTitle, noActorText });
@@ -273,6 +484,11 @@ export class HandManager {
         const scale = this.getSetting(this.SETTING_SCALE);
         const width = Math.max(600, this.getSetting(this.SETTING_WIDTH));
         const $wrapper = this._$panel.find('.hand-wrapper');
+
+        // Apply configurable bottom padding for the cards container
+        const bottom = Number(this.getSetting(this.SETTING_BOTTOM)) || 0;
+        const $container = this._$panel.find('.dh-cards-container');
+        $container.css({ 'padding-bottom': `${bottom}px` });
 
         $wrapper.css({
             'transform': `scale(${scale})`,
@@ -378,7 +594,11 @@ export class HandManager {
             return true;
         });
 
-        if (cards.length === 0) {
+        // Detect adversary actors and prepare a synthetic standard-attack card if needed
+        const isAdversary = (actor.type === 'adversary') || (actor.system?.isAdversary) || (actor.system?.adversary);
+        const adversaryStandard = isAdversary ? this._createAdversaryStandardAttack(actor) : null;
+
+        if (cards.length === 0 && !adversaryStandard) {
             $container.append(`<div class="no-cards">${this.translate('NO_ITEMS')}</div>`);
             return;
         }
@@ -396,6 +616,13 @@ export class HandManager {
         const template = this.currentTemplate;
 
         const fragment = document.createDocumentFragment();
+
+        // If we built a synthetic adversary attack, add it first
+        if (adversaryStandard) {
+            const el = this.createCardElement(adversaryStandard, template);
+            fragment.appendChild(el[0]);
+        }
+
         cards.forEach(item => {
             const el = this.createCardElement(item, template);
             fragment.appendChild(el[0]);
@@ -457,6 +684,13 @@ export class HandManager {
 
             const style = element.style;
 
+            // Temporarily disable transition so the card doesn't animate from the
+            // default (0deg) to the target rotation when the DOM is rebuilt.
+            // We'll restore the transition in the next animation frame so
+            // subsequent interactions still animate smoothly.
+            const prevTransition = element.style.transition;
+            element.style.transition = 'none';
+
             style.marginLeft = index > 0 ? `${marginLeft}px` : '0px';
             style.zIndex = index + 1;
             style.bottom = '0px';
@@ -469,6 +703,14 @@ export class HandManager {
                 const yOffset = Math.abs(distFromCenter) * 5;
                 style.transform = `rotate(${rotation}deg) translateY(${yOffset}px)`;
             }
+
+            // Restore transition in the next frame so future transform changes animate.
+            (function(el, original) {
+                requestAnimationFrame(() => {
+                    // Only clear the inline override if it wasn't modified elsewhere.
+                    if (el && el.style) el.style.transition = original || '';
+                });
+            })(element, prevTransition);
         });
     }
 
