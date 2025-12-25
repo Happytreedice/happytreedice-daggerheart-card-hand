@@ -343,10 +343,17 @@ const cssContent = `
   }
 
   .dh-card-scaler .stress_text {
+    top: 3%;
+    right: 4.5%;
     padding: 7px 2px 0px 3px;
     font-size: 14px;
     filter: none;
     text-shadow: none;
+  }
+
+  .dh-card-scaler .stress_image {
+    top: 3%;
+    right: 4%;
   }
   `;
 
