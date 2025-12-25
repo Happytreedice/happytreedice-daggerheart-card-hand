@@ -8,11 +8,11 @@ import { HandManager } from '../../scripts/hand-manager.js';
 const DOMAIN_COLORS = {
   blade: '#a31e21',    // Red
   bone: '#5e5e5e',     // Grey
-  codex: '#d4a017',    // Gold/Yellow
+  codex: '#00bcd4',    // Cyan/Teal
   grace: '#c23b8f',    // Pink/Magenta
   midnight: '#1a1a2e', // Dark Blue
   sage: '#2e8b57',     // Green
-  splendor: '#00bcd4', // Cyan/Teal
+  splendor: '#d4a017', // Gold/Yellow
   valor: '#e67e22',    // Orange
   arcana: '#4b0082',   // Purple
   default: '#3d3d3d'   // Dark Grey fallback
@@ -102,7 +102,7 @@ const cssContent = `
     background: transparent;
     color: #333;
     padding: 0 0 8px 0;
-    font-size: 16px;
+    font-size: 14px;
     font-weight: 800;
     font-family: var(--dh-font-header);
     display: flex;
@@ -114,7 +114,7 @@ const cssContent = `
     box-sizing: border-box;
     border-bottom: 2px solid #eee;
     margin-bottom: 8px;
-    margin-top: 30px; /* Clear the title */
+    margin-top: 4px; /* Clear the title */
   }
 
   .damage-info + .description {
@@ -166,7 +166,7 @@ const cssContent = `
     bottom: 0;
     z-index: 6;
     box-sizing: border-box;
-    padding: 24px 21.37px 21.37px;
+    padding: 0;
     background: rgba(255,255,255,0.98);
     display: flex;
     flex-direction: column;
@@ -182,32 +182,110 @@ const cssContent = `
     padding-top: 0px; /* push title a bit down from the top of the text block */
     padding-bottom: 8px;
     min-height: 184px;
-    max-height: 350px;
+    max-height: 425px;
   }
 
   /* Make the divider/title layout flow with the text block (no absolute positioning that pins to the whole card) */
   .dh-card-scaler .divider-container {
     position: relative;
     width: 100%;
+    height: fit-content;
     display: flex;
     justify-content: center;
     align-items: center;
     z-index: 7;
+    top: -12px;
   }
 
+  /* Title background: draw a colored layer under the divider image.
+     We use CSS variables assigned on the element to supply the divider
+     image URL and the domain color. The pseudo-element (::before)
+     renders the divider image above the color layer, so transparent
+     parts of the image show the domain color beneath. */
   .dh-card-scaler .title-bg {
     position: absolute;
     top: 50%;
     left: 50%;
-    transform: translate(-50%, -50%) skewX(-15deg);
-    width: 120%;
+    transform: translate(-50%, -50%);
+    width: 100%;
     height: 42px;
-    border: 2px solid rgba(255, 255, 255, 0.4);
-    box-shadow: 0 3px 6px rgba(0, 0, 0, 0.6);
+    border: none;
+    box-shadow: none;
     z-index: 7;
+    background: none;
   }
 
-  .dh-card-scaler .title {
+  .dh-card-scaler .title-bg::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-image: var(--divider-url);
+    background-size: contain;
+    background-repeat: no-repeat;
+    background-position: center;
+    z-index: 2; /* above the color layer, below the text */
+    pointer-events: none;
+  }
+
+  .dh-card-scaler .title-bg-inner {
+    position: absolute;
+    top: 30%;
+    left: 30%;
+    width: 40%;
+    height: 52%;
+    clip-path: polygon(15% 0%, 85% 0%, 100% 50%, 85% 100%, 15% 100%, 0% 50%);
+    background-color: var(--domain-color, transparent);
+    z-index: 1; /* sits under the divider image */
+  }
+
+  .dh-card-scaler .card-title {
+    position: relative;
+    top: 0;
+    transform: none;
+    left: 0;
+    width: 100%;
+    font-family: var(--dh-font-header);
+    font-weight: 800;
+    text-transform: uppercase;
+    font-size: 24px;
+    padding-top: 2px;
+    line-height: 1;
+    text-align: center;
+    color: #000;
+    text-shadow: 0 2px 3px rgba(0, 0, 0, 0.8);
+    margin: 0;
+    z-index: 8;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .dh-card-scaler .card-type {
+    position: relative;
+    top: 0;
+    transform: none;
+    left: 0;
+    width: 120px;
+    font-family: var(--dh-font-header);
+    font-weight: 800;
+    text-transform: uppercase;
+    font-size: 14px;
+    padding-top: 3px;
+    line-height: 1;
+    text-align: center;
+    color: #fff;
+    text-shadow: 0 2px 3px rgba(0, 0, 0, 0.8);
+    margin: 0;
+    z-index: 8;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .dh-card-scaler .domain-card-type {
     position: relative;
     top: 0;
     transform: none;
@@ -229,13 +307,14 @@ const cssContent = `
   }
 
   .dh-card-scaler .description {
-    margin-top: 24px;
+    margin-top: 0px;
     color: #000;
     line-height: 1.3;
     overflow: visible;
     max-width: 100%;
     word-break: break-word;
     font-size: 12px;
+    padding: 0 12px;
   }
 
   .dh-card-scaler {
@@ -303,26 +382,44 @@ const ImprovedTemplate = {
     let plainDesc = tempDiv.innerHTML || tempDiv.innerText || "";
 
     // Расчет размера шрифта
-    let fontSize = 16;
-    const textLength = plainDesc.length;
-    if (textLength > 320) {
-      const ratio = (textLength / 320)/10;
-      fontSize = Math.round(fontSize - (ratio * fontSize));
-    }
-    fontSize = Math.max(fontSize, 12); // Минимальный размер шрифта 12px
+    // Mapping rule:
+    // - textLength <= 360 => fontSize = maxFontSize
+    // - textLength >= 940 => fontSize = minFontSize
+    // - otherwise interpolate linearly between maxFontSize and minFontSize
+    let minFontSize = 12;
+    let maxFontSize = 14;
+    let fontSize = maxFontSize;
 
+    const textLength = plainDesc.length;
+    if (textLength <= 360) {
+      fontSize = maxFontSize;
+    } else if (textLength >= 940) {
+      fontSize = minFontSize;
+    } else {
+      const t = (textLength - 360) / (940 - 360); // 0..1
+      fontSize = Math.round(maxFontSize + (minFontSize - maxFontSize) * t);
+    }
+    // clamp just in case
+    fontSize = Math.max(minFontSize, Math.min(maxFontSize, fontSize));
+
+    
     // Определение домена
     let domainKey = "default";
+    let domainCardType = "default";
     if (item.system.domain) {
       domainKey = item.system.domain.toLowerCase();
+      domainCardType = item.system.type || "ability";
     } else if (item.type === 'class') {
       domainKey = item.name.toLowerCase();
     }
+    
 
     const domainColor = DOMAIN_COLORS[domainKey] || DOMAIN_COLORS.default;
 
     const bannerSrc = `modules/happytreedice-daggerheart-card-hand/templates/default/assets/imgs/${domainKey}/banner.avif`;
     const stressSrc = `modules/happytreedice-daggerheart-card-hand/templates/default/assets/imgs/default/stress-cost.avif`;
+
+    const dividerSrc = `modules/happytreedice-daggerheart-card-hand/templates/improved/assets/imgs/domain-divider.png`;
 
     const level = item.system.level || "";
     const recallCost = item.system.recallCost;
@@ -339,7 +436,12 @@ const ImprovedTemplate = {
     // Damage Info
     let damageHtml = "";
 
-    if (item.type === 'weapon') {
+    console.log('Improved Template | Rendering item:', item);
+
+    const itemType = item.type || item.system.type || "ability";
+    const itemTypeLocalized = HandManager.formatItemType(itemType);
+
+    if (itemType === 'weapon') {
       const damageFormula = HandManager._getDamageFormula(item);
       const damageLabels = HandManager._getDamageLabels(item);
       const rangeRaw = item.system?.attack?.range || item.system?.range || '';
@@ -355,7 +457,11 @@ const ImprovedTemplate = {
       }
     }
 
-
+    let domainCardTypeHtml = "";
+    if (item.system.domain) {
+      const domainCardTypeText = HandManager.formatDomainCardType(domainCardType);
+      domainCardTypeHtml = `<p class="domain-card-type">${domainCardTypeText}</p>`;
+    }
     // HTML Шаблон
     const html = `
               ${level ? `<img class="card-banner_image" src="${bannerSrc}"><div class="card-level">${level}</div>` : ''}
@@ -365,11 +471,13 @@ const ImprovedTemplate = {
                 </div>
                 <div class="card-text-content">
                     <div class="divider-container">
-                      <div class="title-bg" style="background-color: ${domainColor};"></div>
-                      <p class="title">${item.name}</p>
+                      <div class="title-bg" style="--divider-url: url('${dividerSrc}'); --domain-color: ${domainColor};"><div class="title-bg-inner"></div></div>
+                      <p class="card-type">${itemTypeLocalized}</p>
                     </div>
+                    <div class="card-title">${item.name}</div>
                     ${damageHtml}
-                    <div class="description" style="font-size: ${fontSize}px;">${plainDesc}</div>
+                    <div class="description" style="font-size: ${fontSize}px;">
+                    ${plainDesc}</div>
                 </div>
                     `;
     return html;

@@ -8,11 +8,11 @@ import { HandManager } from '../../scripts/hand-manager.js';
 const DOMAIN_COLORS = {
   blade: '#a31e21',    // Red
   bone: '#5e5e5e',     // Grey
-  codex: '#d4a017',    // Gold/Yellow
+  codex: '#00bcd4',    // Cyan/Teal
   grace: '#c23b8f',    // Pink/Magenta
   midnight: '#1a1a2e', // Dark Blue
   sage: '#2e8b57',     // Green
-  splendor: '#00bcd4', // Cyan/Teal
+  splendor: '#d4a017', // Gold/Yellow
   valor: '#e67e22',    // Orange
   arcana: '#4b0082',   // Purple
   default: '#3d3d3d'   // Dark Grey fallback

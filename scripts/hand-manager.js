@@ -274,6 +274,27 @@ export class HandManager {
      * @param {any} range
      * @returns {string}
      */
+    static formatItemType(itemType) {
+        if (!itemType && itemType !== 0) return '';
+        const i18n = (typeof game !== 'undefined' && game.i18n) ? game.i18n : null;
+
+        let translatedType = '';
+        if (itemType) {
+            const key = `TYPES.Item.${itemType}`;
+            if (i18n && i18n.has(key)) translatedType = i18n.localize(key);
+            else translatedType = itemType;
+        }
+
+        return translatedType;
+    }
+
+    /**
+     * Форматирует и локализует данные по дальности атаки/оружия.
+     * Поддерживает строки и объекты вида {type, value} или {range, distance}.
+     * Возвращает локализованную строку вида "<RangeLabel>: <TranslatedType> <value>" или пустую строку.
+     * @param {any} range
+     * @returns {string}
+     */
     static formatDomainCardType(domainCardType) {
         if (!domainCardType && domainCardType !== 0) return '';
         const i18n = (typeof game !== 'undefined' && game.i18n) ? game.i18n : null;
@@ -281,7 +302,6 @@ export class HandManager {
         let translatedType = '';
         if (domainCardType) {
             const key = `DAGGERHEART.CONFIG.DomainCardTypes.${domainCardType}`;
-            console.log("Domain Card Type Key:", key);
             if (i18n && i18n.has(key)) translatedType = i18n.localize(key);
             else translatedType = domainCardType;
         }
