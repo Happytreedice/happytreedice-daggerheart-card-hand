@@ -305,8 +305,8 @@ const ImprovedTemplate = {
     // Расчет размера шрифта
     let fontSize = 16;
     const textLength = plainDesc.length;
-    if (textLength > 160) {
-      const ratio = (textLength / 160)/10;
+    if (textLength > 320) {
+      const ratio = (textLength / 320)/10;
       fontSize = Math.round(fontSize - (ratio * fontSize));
     }
     fontSize = Math.max(fontSize, 12); // Минимальный размер шрифта 12px
