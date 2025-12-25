@@ -182,6 +182,7 @@ const cssContent = `
     padding-top: 0px; /* push title a bit down from the top of the text block */
     padding-bottom: 8px;
     min-height: 184px;
+    max-height: 350px;
   }
 
   /* Make the divider/title layout flow with the text block (no absolute positioning that pins to the whole card) */
@@ -234,7 +235,7 @@ const cssContent = `
     overflow: visible;
     max-width: 100%;
     word-break: break-word;
-    font-size: 16px !important;
+    font-size: 12px;
   }
 
   .dh-card-scaler {
@@ -302,12 +303,13 @@ const ImprovedTemplate = {
     let plainDesc = tempDiv.innerHTML || tempDiv.innerText || "";
 
     // Расчет размера шрифта
-    let fontSize = 18;
+    let fontSize = 16;
     const textLength = plainDesc.length;
     if (textLength > 160) {
       const ratio = (textLength / 160)/10;
       fontSize = Math.round(fontSize - (ratio * fontSize));
     }
+    fontSize = Math.max(fontSize, 12); // Минимальный размер шрифта 12px
 
     // Определение домена
     let domainKey = "default";
