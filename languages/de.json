@@ -18,7 +18,9 @@
             "ENABLED_NAME": "Kartenhand aktivieren",
             "ENABLED_HINT": "Zeigen Sie die Kartenhand-Oberfläche auf dem Bildschirm an.",
             "TEMPLATE_NAME": "Kartenvorlage",
-            "TEMPLATE_HINT": "Wählen Sie den visuellen Stil der Karten."
+            "TEMPLATE_HINT": "Wählen Sie den visuellen Stil der Karten.",
+            "BOTTOM_NAME": "Abstand unten (px)",
+            "BOTTOM_HINT": "Zusätzlicher Abstand unten im Kartencontainer (in Pixel)."
         },
         "TOOLTIPS": {
             "DRAG": "Ziehen (X)",

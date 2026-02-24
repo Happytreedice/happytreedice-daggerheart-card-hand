@@ -8,11 +8,11 @@ import { HandManager } from '../../scripts/hand-manager.js';
 const DOMAIN_COLORS = {
   blade: '#a31e21',    // Red
   bone: '#5e5e5e',     // Grey
-  codex: '#d4a017',    // Gold/Yellow
+  codex: '#00bcd4',    // Cyan/Teal
   grace: '#c23b8f',    // Pink/Magenta
   midnight: '#1a1a2e', // Dark Blue
   sage: '#2e8b57',     // Green
-  splendor: '#00bcd4', // Cyan/Teal
+  splendor: '#d4a017', // Gold/Yellow
   valor: '#e67e22',    // Orange
   arcana: '#4b0082',   // Purple
   default: '#3d3d3d'   // Dark Grey fallback
@@ -128,17 +128,30 @@ const cssContent = `
     letter-spacing: 0.5px;
     margin-top: 2px;
   }
+  .damage-range {
+    font-size: 13px;
+    color: #444;
+    margin-top: 4px;
+    font-weight: 600;
+  }
   `;
 
-const style = document.createElement('style');
-style.id = cssId;
-style.appendChild(document.createTextNode(cssContent));
-document.head.appendChild(style);
-console.log('Quick Items Daggerheart | Styles injected');
+function attachStyles() {
+  // Remove any other template styles so only the active template's styles are present
+  document.querySelectorAll('[id^="' + cssId + '"]').forEach(el => el.remove());
+  const id = `${cssId}-default`;
+  if (document.getElementById(id)) return;
+  const style = document.createElement('style');
+  style.id = id;
+  style.appendChild(document.createTextNode(cssContent));
+  document.head.appendChild(style);
+  console.log('Quick Items Daggerheart | Styles injected (default)');
+}
 
 const DefaultTemplate = {
   id: 'default',
   name: 'Standard Daggerheart',
+  attachStyles,
 
   /**
    * Генерирует HTML для панели руки.
@@ -173,10 +186,12 @@ const DefaultTemplate = {
     const img = item.img || 'icons/svg/item-bag.svg';
     const desc = item.system.description?.value || item.system.description || "";
 
-    // Очистка и расчет текста описания
+    // Очистка и расчет текста описания — используем общий метод HandManager.formatDescription
     const tempDiv = document.createElement("div");
-    tempDiv.innerHTML = desc;
-    let plainDesc = tempDiv.textContent || tempDiv.innerText || "";
+    const processed = HandManager.formatDescription(desc);
+    tempDiv.innerHTML = processed;
+    // Keep HTML (innerHTML) so formatting tags are preserved when inserted into the card
+    let plainDesc = tempDiv.innerHTML || tempDiv.innerText || "";
 
     // Расчет размера шрифта
     let fontSize = 18;
@@ -217,11 +232,15 @@ const DefaultTemplate = {
     if (item.type === 'weapon') {
       const damageFormula = HandManager._getDamageFormula(item);
       const damageLabels = HandManager._getDamageLabels(item);
+      // Try common locations for range data
+      const rangeRaw = item.system?.attack?.range || item.system?.range || '';
+      const rangeText = HandManager.formatRange(rangeRaw);
       if (damageFormula) {
         damageHtml = `
              <div class="damage-info">
                  <span class="damage-formula">${damageFormula}</span>
                  <span class="damage-labels">${damageLabels}</span>
+                 ${rangeText ? `<span class="damage-range">${rangeText}</span>` : ''}
              </div>
          `;
       }

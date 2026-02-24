@@ -18,7 +18,9 @@
             "ENABLED_NAME":"Enable Card Hand",
             "ENABLED_HINT":"Show the card hand interface on the screen.",
             "TEMPLATE_NAME": "Card Template",
-            "TEMPLATE_HINT": "Choose the visual style of the cards."
+            "TEMPLATE_HINT": "Choose the visual style of the cards.",
+            "BOTTOM_NAME": "Cards Bottom Padding",
+            "BOTTOM_HINT": "Additional bottom padding (in pixels) inside the cards container."
         },
         "TOOLTIPS": {
             "DRAG": "Drag (X)",

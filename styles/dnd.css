@@ -253,3 +253,8 @@ body.dragging-active {
     overflow: visible;
     user-select: none;
 }
+
+  .dh-card-scaler .description ul,
+  .dh-card-scaler .description ol {
+    margin: 0 0;
+  }
