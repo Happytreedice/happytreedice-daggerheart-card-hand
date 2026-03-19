@@ -15,6 +15,10 @@ export class HandManager {
     static SETTING_SCALE = 'handScale';
     static SETTING_WIDTH = 'handWidthPx';
     static SETTING_BOTTOM = 'bottom';
+    static SETTING_SHOW_WEAPONS = 'showWeapons';
+    static SETTING_SHOW_DOMAIN_CARDS = 'showDomainCards';
+    static SETTING_SHOW_FEATURES = 'showFeatures';
+    static SETTING_SHOW_CONSUMABLES = 'showConsumables';
 
     static _currentActor = null;
     static _isCollapsed = false;
@@ -37,7 +41,11 @@ export class HandManager {
                 [this.SETTING_FILTER_EQUIPPED]: true,
                 [this.SETTING_SCALE]: 1.0,
                 [this.SETTING_WIDTH]: 800,
-                [this.SETTING_BOTTOM]: 15
+                [this.SETTING_BOTTOM]: 15,
+                [this.SETTING_SHOW_WEAPONS]: true,
+                [this.SETTING_SHOW_DOMAIN_CARDS]: true,
+                [this.SETTING_SHOW_FEATURES]: true,
+                [this.SETTING_SHOW_CONSUMABLES]: true,
             };
             return defaults[key];
         }
@@ -130,6 +138,24 @@ export class HandManager {
                 this.applyStyles();
                 this.applyCardFanLayout();
             }
+        });
+
+        const types = [
+            { id: this.SETTING_SHOW_WEAPONS, name: "SETTINGS.SHOW_WEAPONS_NAME", hint: "SETTINGS.SHOW_WEAPONS_HINT" },
+            { id: this.SETTING_SHOW_DOMAIN_CARDS, name: "SETTINGS.SHOW_DOMAIN_CARDS_NAME", hint: "SETTINGS.SHOW_DOMAIN_CARDS_HINT" },
+            { id: this.SETTING_SHOW_FEATURES, name: "SETTINGS.SHOW_FEATURES_NAME", hint: "SETTINGS.SHOW_FEATURES_HINT" },
+            { id: this.SETTING_SHOW_CONSUMABLES, name: "SETTINGS.SHOW_CONSUMABLES_NAME", hint: "SETTINGS.SHOW_CONSUMABLES_HINT" },
+        ];
+        types.forEach(t => {
+            game.settings.register(this.MODULE_NAME, t.id, {
+                name: this.translate(t.name),
+                hint: this.translate(t.hint),
+                scope: "client",
+                config: true,
+                type: Boolean,
+                default: true,
+                onChange: () => this.refreshHand()
+            });
         });
     }
 
@@ -574,6 +600,10 @@ export class HandManager {
         const allItems = actor.items ? Array.from(actor.items) : [];
 
         const showEquippedOnly = this.getSetting(this.SETTING_FILTER_EQUIPPED);
+        const showWeapons = this.getSetting(this.SETTING_SHOW_WEAPONS);
+        const showDomainCards = this.getSetting(this.SETTING_SHOW_DOMAIN_CARDS);
+        const showFeatures = this.getSetting(this.SETTING_SHOW_FEATURES);
+        const showConsumables = this.getSetting(this.SETTING_SHOW_CONSUMABLES);
 
         const cards = allItems.filter(item => {
             if (['class', 'subclass', 'race', 'ancestry', 'community'].includes(item.type)) return false;
@@ -581,8 +611,15 @@ export class HandManager {
             const hasActions = this.itemHasActions(item);
             const isWeapon = item.type === 'weapon';
             const isDomain = item.type === 'domainCard';
+            const isFeature = item.type === 'feature';
+            const isConsumable = item.type === 'consumable';
 
             if (!hasActions && !isWeapon && !isDomain) return false;
+
+            if (isWeapon && !showWeapons) return false;
+            if (isDomain && !showDomainCards) return false;
+            if (isFeature && !showFeatures) return false;
+            if (isConsumable && !showConsumables) return false;
 
             if (showEquippedOnly) {
                 if (item.system?.hasOwnProperty('equipped') && item.system.equipped == false) return false;

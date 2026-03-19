@@ -20,7 +20,15 @@
             "TEMPLATE_NAME": "Card Template",
             "TEMPLATE_HINT": "Choose the visual style of the cards.",
             "BOTTOM_NAME": "Cards Bottom Padding",
-            "BOTTOM_HINT": "Additional bottom padding (in pixels) inside the cards container."
+            "BOTTOM_HINT": "Additional bottom padding (in pixels) inside the cards container.",
+            "SHOW_WEAPONS_NAME": "Show Weapons Cards",
+            "SHOW_WEAPONS_HINT": "Display weapon cards in your hand.",
+            "SHOW_DOMAIN_CARDS_NAME": "Show Domain Cards",
+            "SHOW_DOMAIN_CARDS_HINT": "Display domain cards in your hand.",
+            "SHOW_FEATURES_NAME": "Show Active Features Cards",
+            "SHOW_FEATURES_HINT": "Display active features cards in your hand.",
+            "SHOW_CONSUMABLES_NAME": "Show Consumables Cards",
+            "SHOW_CONSUMABLES_HINT": "Display consumable cards in your hand."
         },
         "TOOLTIPS": {
             "DRAG": "Drag (X)",
