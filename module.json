@@ -28,8 +28,7 @@
         {
             "lang": "ru",
             "name": "Russian",
-            "path": "languages/ru.json",
-            "flags": {}
+            "path": "languages/ru.json"
         },
         {
             "lang": "en",
