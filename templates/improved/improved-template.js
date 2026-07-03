@@ -424,7 +424,7 @@ const ImprovedTemplate = {
     // clamp just in case
     fontSize = Math.max(minFontSize, Math.min(maxFontSize, fontSize));
 
-    
+
     // Определение домена
     let domainKey = "default";
     let domainCardType = "default";
@@ -434,7 +434,7 @@ const ImprovedTemplate = {
     } else if (item.type === 'class') {
       domainKey = item.name.toLowerCase();
     }
-    
+
 
     const domainColor = DOMAIN_COLORS[domainKey] || DOMAIN_COLORS.default;
     const domainFontColor = DOMAIN_TEXT_COLORS[domainKey] || DOMAIN_TEXT_COLORS.default;
