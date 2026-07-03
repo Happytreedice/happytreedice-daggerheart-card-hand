@@ -1,10 +1,10 @@
 {
     "id": "happytreedice-daggerheart-card-hand",
     "title": "Happytreedice Daggerheart card hand",
-    "version": "1.0.6",
+    "version": "1.1.0",
     "compatibility": {
         "minimum": "13",
-        "verified": "14",
+        "verified": "14.364",
         "maximum": "14"
     },
     "relationships": {
@@ -12,7 +12,10 @@
             {
                 "id": "daggerheart",
                 "type": "system",
-                "compatibility": {}
+                "compatibility": {
+                    "minimum": "1.2.7",
+                    "verified": "2.4.2"
+                }
             }
         ]
     },
@@ -42,8 +45,8 @@
         }
     ],
     "manifest": "https://raw.githubusercontent.com/Happytreedice/happytreedice-daggerheart-card-hand/refs/heads/master/module.json",
-    "download": "https://github.com/Happytreedice/happytreedice-daggerheart-card-hand/releases/download/1.0.6/happytreedice-daggerheart-card-hand.zip",
-    "description": "",
+    "download": "https://github.com/Happytreedice/happytreedice-daggerheart-card-hand/releases/download/1.1.0/happytreedice-daggerheart-card-hand.zip",
+    "description": "A card hand UI for the Daggerheart system (Foundryborne): shows the selected actor's weapons, domain cards, features and consumables as cards. Supports pluggable card templates provided by other modules.",
     "flags": {},
     "styles": [
         "./styles/dnd.css"

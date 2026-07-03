@@ -1,12 +1,14 @@
 import { SmoothDnD, CardSmoothDnD } from './dnd.js';
-import { getTemplate, getTemplateChoices } from './registry.js';
+import { MODULE_ID, getTemplate, getTemplateChoices } from './registry.js';
 
 /**
  * Daggerheart Card Hand Manager
  * Handles UI creation, state management, and interaction logic.
+ *
+ * FoundryVTT 13/14 compatible: no jQuery, no Application V1 / Dialog V1.
  */
 export class HandManager {
-    static MODULE_NAME = 'happytreedice-daggerheart-card-hand';
+    static MODULE_NAME = MODULE_ID;
 
     static SETTING_ENABLED = 'handEnabled';
     static SETTING_TEMPLATE = 'cardTemplate';
@@ -23,17 +25,20 @@ export class HandManager {
     static _currentActor = null;
     static _isCollapsed = false;
     static _dndInstance = null;
+    static _activeTemplateId = null;
 
-    // Optimization: Cache DOM elements
-    static _$panel = null;
-    static _$container = null;
+    // Optimization: cache DOM elements
+    /** @type {HTMLElement|null} */
+    static _panel = null;
+    /** @type {HTMLElement|null} */
+    static _container = null;
     static _refreshDebounceTimer = null;
 
     static getSetting(key) {
         try {
             return game.settings.get(this.MODULE_NAME, key);
         } catch (e) {
-            // Fallback values if settings are not registered or module ID mismatch
+            // Fallback values if settings are not registered yet
             const defaults = {
                 [this.SETTING_ENABLED]: true,
                 [this.SETTING_TEMPLATE]: 'default',
@@ -63,8 +68,6 @@ export class HandManager {
             onChange: () => this.refreshHand()
         });
 
-        const templateChoices = getTemplateChoices();
-
         game.settings.register(this.MODULE_NAME, this.SETTING_TEMPLATE, {
             name: this.translate("SETTINGS.TEMPLATE_NAME"),
             hint: this.translate("SETTINGS.TEMPLATE_HINT"),
@@ -72,15 +75,8 @@ export class HandManager {
             config: true,
             type: String,
             default: "default",
-            choices: templateChoices,
-            onChange: () => {
-                if (this._$panel) {
-                    this._$panel.remove();
-                    this._$panel = null;
-                    this._$container = null;
-                }
-                this.refreshHand();
-            }
+            choices: getTemplateChoices(),
+            onChange: () => this.rebuildPanel()
         });
 
         game.settings.register(this.MODULE_NAME, this.SETTING_ARC_ANGLE, {
@@ -165,7 +161,20 @@ export class HandManager {
         return game.i18n.localize(key);
     }
 
+    /** Escapes a string for safe interpolation into HTML. */
+    static escapeHtml(str) {
+        if (str === null || str === undefined) return '';
+        if (foundry?.utils?.escapeHTML) return foundry.utils.escapeHTML(String(str));
+        return String(str)
+            .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    }
+
     static itemHasActions(item) {
+        // Foundryborne exposes prepared actions via system.actionsList
+        const list = item.system?.actionsList;
+        if (Array.isArray(list)) return list.length > 0;
+
         const actions = item.system?.actions;
         if (!actions) return false;
         if (typeof actions.size === 'number') return actions.size > 0;
@@ -176,50 +185,48 @@ export class HandManager {
     // --- Helpers ---
 
     static _getDamageFormula(item) {
-        if (!item.system.attack?.damage?.parts) return "";
+        const parts = item.system.attack?.damage?.parts;
+        if (!parts) return "";
 
-        const parts = [];
-        for (const part of item.system.attack.damage.parts) {
+        const RollCls = foundry.dice?.Roll ?? Roll;
+        const rollData = item.actor?.getRollData?.() ?? {};
+        const formulas = [];
+
+        // parts is an IterableTypedObjectField in Foundryborne (iterable of DHDamageData)
+        for (const part of parts) {
             const { value } = part;
-            // Use system logic or fallback
-            // Replicating Daggerheart's DHActionDiceData.getFormula logic roughly if needed,
-            // but since we have the item, we might be able to rely on its data if it's prepared.
-
-            // However, the `value` in `parts` is a DataModel instance in the system. 
-            // If `item` is a proper system document, `value.getFormula()` should work.
-            // But let's be safe and replicate the formula construction if accessors aren't available 
-            // or if we want to be sure.
+            if (!value) continue;
 
             let formula = "";
-            if (value.custom?.enabled) {
+            if (typeof value.getFormula === 'function') {
+                // Prepared system DataModel — use the system's own logic
+                formula = value.getFormula();
+            } else if (value.custom?.enabled) {
                 formula = value.custom.formula;
             } else {
                 const multiplier = value.multiplier === 'flat' ? value.flatMultiplier : `@${value.multiplier}`;
-                // Handle bonus sign
                 const bonus = value.bonus ? (value.bonus < 0 ? ` - ${Math.abs(value.bonus)}` : ` + ${value.bonus}`) : '';
                 formula = `${multiplier ?? 1}${value.dice}${bonus}`;
             }
 
-            // Replace data
-            const rollData = item.actor?.getRollData() ?? {};
-            if (Roll.replaceFormulaData) {
-                formula = Roll.replaceFormulaData(formula, rollData);
+            if (RollCls.replaceFormulaData) {
+                formula = RollCls.replaceFormulaData(formula, rollData);
             }
-            parts.push(formula);
+            formulas.push(formula);
         }
 
-        return parts.join(" + ");
+        return formulas.join(" + ");
     }
 
     static _getDamageLabels(item) {
-        if (!item.system.attack?.damage?.parts) return "";
+        const parts = item.system.attack?.damage?.parts;
+        if (!parts) return "";
 
         const uniqueTypes = new Set();
-        for (const part of item.system.attack.damage.parts) {
-            if (part.type) {
-                const types = part.type instanceof Set ? part.type : (Array.isArray(part.type) ? part.type : [part.type]);
-                types.forEach(t => uniqueTypes.add(t));
-            }
+        for (const part of parts) {
+            if (!part.type) continue;
+            const types = part.type instanceof Set ? part.type : (Array.isArray(part.type) ? part.type : [part.type]);
+            types.forEach(t => uniqueTypes.add(t));
         }
 
         const labels = [];
@@ -246,8 +253,7 @@ export class HandManager {
         descHtml = descHtml.replace(/@Template\[[^\]]*\]/g, '');
         // Replace patterns like @Something[...]{Label} -> <strong>Label</strong>
         descHtml = descHtml.replace(/@[^\[]*\[[^\]]*\]\{([^}]*)\}/g, (m, label) => {
-            const escaped = String(label).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-            return `<strong>${escaped}</strong>`;
+            return `<strong>${this.escapeHtml(label)}</strong>`;
         });
         return descHtml;
     }
@@ -255,14 +261,13 @@ export class HandManager {
     /**
      * Форматирует и локализует данные по дальности атаки/оружия.
      * Поддерживает строки и объекты вида {type, value} или {range, distance}.
-     * Возвращает локализованную строку вида "<RangeLabel>: <TranslatedType> <value>" или пустую строку.
      * @param {any} range
-     * @returns {string}
+     * @returns {string} "<RangeLabel>: <TranslatedType> <value>" или пустая строка.
      */
     static formatRange(range) {
         if (!range && range !== 0) return '';
-        const i18n = (typeof game !== 'undefined' && game.i18n) ? game.i18n : null;
-        const rangeLabel = i18n && i18n.has('DAGGERHEART.GENERAL.range') ? i18n.localize('DAGGERHEART.GENERAL.range') : 'Range';
+        const i18n = game?.i18n;
+        const rangeLabel = i18n?.has('DAGGERHEART.GENERAL.range') ? i18n.localize('DAGGERHEART.GENERAL.range') : 'Range';
 
         let type = '';
         let value = '';
@@ -281,8 +286,7 @@ export class HandManager {
         let translatedType = '';
         if (type) {
             const key = `DAGGERHEART.CONFIG.Range.${type}.short`;
-            if (i18n && i18n.has(key)) translatedType = i18n.localize(key);
-            else translatedType = type;
+            translatedType = i18n?.has(key) ? i18n.localize(key) : type;
         }
 
         const parts = [];
@@ -294,45 +298,39 @@ export class HandManager {
     }
 
     /**
-     * Форматирует и локализует данные по дальности атаки/оружия.
-     * Поддерживает строки и объекты вида {type, value} или {range, distance}.
-     * Возвращает локализованную строку вида "<RangeLabel>: <TranslatedType> <value>" или пустую строку.
-     * @param {any} range
+     * Локализует тип предмета (TYPES.Item.<type>).
+     * @param {string} itemType
      * @returns {string}
      */
     static formatItemType(itemType) {
         if (!itemType && itemType !== 0) return '';
-        const i18n = (typeof game !== 'undefined' && game.i18n) ? game.i18n : null;
-
-        let translatedType = '';
-        if (itemType) {
-            const key = `TYPES.Item.${itemType}`;
-            if (i18n && i18n.has(key)) translatedType = i18n.localize(key);
-            else translatedType = itemType;
-        }
-
-        return translatedType;
+        const key = `TYPES.Item.${itemType}`;
+        return game?.i18n?.has(key) ? game.i18n.localize(key) : itemType;
     }
 
     /**
-     * Форматирует и локализует данные по дальности атаки/оружия.
-     * Поддерживает строки и объекты вида {type, value} или {range, distance}.
-     * Возвращает локализованную строку вида "<RangeLabel>: <TranslatedType> <value>" или пустую строку.
-     * @param {any} range
+     * Локализует тип карты домена (ability/spell/grimoire).
+     * @param {string} domainCardType
      * @returns {string}
      */
     static formatDomainCardType(domainCardType) {
         if (!domainCardType && domainCardType !== 0) return '';
-        const i18n = (typeof game !== 'undefined' && game.i18n) ? game.i18n : null;
+        const key = `DAGGERHEART.CONFIG.DomainCardTypes.${domainCardType}`;
+        return game?.i18n?.has(key) ? game.i18n.localize(key) : domainCardType;
+    }
 
-        let translatedType = '';
-        if (domainCardType) {
-            const key = `DAGGERHEART.CONFIG.DomainCardTypes.${domainCardType}`;
-            if (i18n && i18n.has(key)) translatedType = i18n.localize(key);
-            else translatedType = domainCardType;
+    /**
+     * Возвращает данные домена из конфига системы (включая homebrew-домены).
+     * @param {string} domainKey
+     * @returns {{id: string, label: string, src: string}|null}
+     */
+    static getDomainConfig(domainKey) {
+        try {
+            const all = CONFIG.DH?.DOMAIN?.allDomains?.() ?? CONFIG.DH?.DOMAIN?.domains ?? {};
+            return all[domainKey] ?? null;
+        } catch (e) {
+            return CONFIG.DH?.DOMAIN?.domains?.[domainKey] ?? null;
         }
-
-        return translatedType;
     }
 
     /**
@@ -349,14 +347,14 @@ export class HandManager {
 
         const id = `adv-std-${actor.id}`;
 
-        // Попробуем взять данные атаки из actor.system.attack, если есть
-        const atk = actor.system?.attack || actor.system?.actions || null;
+        // В Foundryborne стандартная атака противника лежит в actor.system.attack (ActionField)
+        const atk = actor.system?.attack || null;
 
         const atkName = atk?.name || 'Standard Attack';
         const img = atk?.img || 'icons/svg/sword.svg';
 
         // Damage parts: если в данных актора есть parts, используем их, иначе дефолт
-        const parts = (atk && atk.damage && atk.damage.parts) ? atk.damage.parts : [
+        const parts = atk?.damage?.parts ? atk.damage.parts : [
             {
                 value: {
                     custom: { enabled: false, formula: '' },
@@ -377,14 +375,13 @@ export class HandManager {
             img,
             actor,
             system: {
-                description: { value: ' ' },
-                domain: 'default',
+                description: ' ',
+                domain: '',
                 level: '',
                 recallCost: 0,
                 stress: 0,
                 attack: {
-                    // preserve roll data if present
-                    roll: atk?.roll || (actor.system?.attack?.roll ?? {}),
+                    roll: atk?.roll ?? {},
                     damage: {
                         parts,
                         includeBase: atk?.damage?.includeBase ?? false,
@@ -396,28 +393,15 @@ export class HandManager {
             }
         };
 
-        // Добавляем метод roll, чтобы HandManager.useItem мог его вызвать
-        synthetic.roll = async function (event) {
-            const item = this;
-            const actor = item.actor;
-            const speaker = ChatMessage.getSpeaker({ actor });
-
-            // Try to invoke the system-provided attack if available (matches sheet button behavior)
-            try {
-                const sysAttack = actor.system?.attack;
-                if (sysAttack && typeof sysAttack.use === 'function') {
-                    // Call with null event to mimic sheet button
-                    try {
-                        const res = sysAttack.use({});
-                        if (res instanceof Promise) await res;
-                        return;
-                    } catch (inner) {
-                        // If call fails, fall back to manual rolling below
-                        console.warn('Adversary synthetic attack: actor.system.attack.use failed, falling back', inner);
-                    }
+        // Метод use, чтобы HandManager.useItem мог вызвать атаку как с листа противника
+        synthetic.use = async function (event) {
+            const sysAttack = actor.system?.attack;
+            if (sysAttack && typeof sysAttack.use === 'function') {
+                try {
+                    return await sysAttack.use(event ?? {});
+                } catch (inner) {
+                    console.warn(`${HandManager.MODULE_NAME} | adversary standard attack failed`, inner);
                 }
-            } catch (e) {
-                // ignore and continue to manual roll
             }
         };
 
@@ -432,38 +416,76 @@ export class HandManager {
         return getTemplate(id) || getTemplate('default');
     }
 
+    /** Default panel markup, used when a template does not define renderPanel. */
+    static renderDefaultPanel({ dragTitle, noActorText }) {
+        return `
+            <div id="daggerheart-hand">
+                <div class="hand-wrapper">
+                    <div class="hand-background-plate" id="dh-hand-drag-target">
+                        <div class="drag-handle-area" title="${this.escapeHtml(dragTitle)}"></div>
+                    </div>
+                    <div class="dh-cards-container">
+                        <div class="no-cards">${this.escapeHtml(noActorText)}</div>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    /** Fully removes and re-creates the panel (used when the template changes). */
+    static rebuildPanel() {
+        const previous = this._activeTemplateId ? getTemplate(this._activeTemplateId) : null;
+        try {
+            previous?.detachStyles?.();
+        } catch (e) {
+            console.warn(`${this.MODULE_NAME} | detachStyles failed:`, e);
+        }
+        this._panel?.remove();
+        this._panel = null;
+        this._container = null;
+        this._activeTemplateId = null;
+        this.refreshHand();
+    }
+
     static createHandPanel() {
-        // Optimization: Use cached selector if available
-        if (this._$panel || document.getElementById('daggerheart-hand')) {
-            this._$panel = $('#daggerheart-hand');
-            this._$container = this._$panel.find('.dh-cards-container');
+        // Reuse an already existing panel
+        const existing = document.getElementById('daggerheart-hand');
+        if (this._panel || existing) {
+            this._panel = existing ?? this._panel;
+            this._container = this._panel.querySelector('.dh-cards-container');
             return;
         }
 
         const dragTitle = this.translate("TOOLTIPS.DRAG");
         const noActorText = this.translate('NO_ACTOR');
 
-        // Получаем HTML панели из текущего шаблона
         const template = this.currentTemplate;
         if (!template) {
-            console.error("Quick Items Daggerheart | No template found!");
+            console.error(`${this.MODULE_NAME} | No template found!`);
             return;
         }
 
         // Ensure only the active template injects its styles and any observers
         try {
-            if (typeof template.attachStyles === 'function') template.attachStyles();
+            template.attachStyles?.();
         } catch (e) {
-            console.warn('Quick Items Daggerheart | Failed to attach template styles:', e);
+            console.warn(`${this.MODULE_NAME} | Failed to attach template styles:`, e);
         }
+        this._activeTemplateId = template.id;
 
-        const html = template.renderPanel({ dragTitle, noActorText });
+        const html = typeof template.renderPanel === 'function'
+            ? template.renderPanel({ dragTitle, noActorText })
+            : this.renderDefaultPanel({ dragTitle, noActorText });
 
-        $('body').append(html);
+        document.body.insertAdjacentHTML('beforeend', html);
 
         // Cache references immediately
-        this._$panel = $('#daggerheart-hand');
-        this._$container = this._$panel.find('.dh-cards-container');
+        this._panel = document.getElementById('daggerheart-hand');
+        this._container = this._panel?.querySelector('.dh-cards-container');
+        if (!this._panel || !this._container) {
+            console.error(`${this.MODULE_NAME} | Template "${template.id}" produced invalid panel markup`);
+            return;
+        }
 
         this.applyStyles();
 
@@ -474,88 +496,96 @@ export class HandManager {
         const isEnabled = this.getSetting(this.SETTING_ENABLED);
 
         if (!isEnabled) {
-            this._$panel.addClass('hidden'); // Скрываем всю панель
+            this._panel.classList.add('hidden');
             return;
         }
 
         const controlled = canvas.tokens?.controlled || [];
 
         if (controlled.length === 0) {
-            this._$panel.addClass('hidden');
-            this._currentActor = null; // Сбрасываем текущего актера
-            return;
+            this._panel.classList.add('hidden');
+            this._currentActor = null;
         }
     }
 
     static toggleHand() {
-        if (!this._$panel) return;
+        if (!this._panel) return;
 
         this._isCollapsed = !this._isCollapsed;
-        const $bg = this._$panel.find('.hand-background-plate');
+        const bg = this._panel.querySelector('.hand-background-plate');
 
         if (this._isCollapsed) {
-            this._$container.fadeOut(200);
-            $bg.fadeOut(200);
-            this._$panel.addClass('collapsed');
+            this._fadeOut(this._container);
+            this._fadeOut(bg);
+            this._panel.classList.add('collapsed');
         } else {
-            this._$panel.removeClass('collapsed');
-            this._$container.fadeIn(200, () => this.applyCardFanLayout());
-            $bg.fadeIn(200);
+            this._panel.classList.remove('collapsed');
+            this._fadeIn(this._container, () => this.applyCardFanLayout());
+            this._fadeIn(bg);
         }
     }
 
+    static _fadeOut(el, duration = 200) {
+        if (!el) return;
+        const anim = el.animate([{ opacity: 1 }, { opacity: 0 }], { duration, fill: 'forwards' });
+        anim.onfinish = () => { el.style.display = 'none'; anim.cancel(); el.style.opacity = ''; };
+    }
+
+    static _fadeIn(el, callback, duration = 200) {
+        if (!el) return;
+        el.style.display = '';
+        const anim = el.animate([{ opacity: 0 }, { opacity: 1 }], { duration });
+        anim.onfinish = () => { callback?.(); };
+    }
+
     static applyStyles() {
-        if (!this._$panel) return;
+        if (!this._panel) return;
 
         const scale = this.getSetting(this.SETTING_SCALE);
         const width = Math.max(600, this.getSetting(this.SETTING_WIDTH));
-        const $wrapper = this._$panel.find('.hand-wrapper');
+        const wrapper = this._panel.querySelector('.hand-wrapper');
 
         // Apply configurable bottom padding for the cards container
         const bottom = Number(this.getSetting(this.SETTING_BOTTOM)) || 0;
-        const $container = this._$panel.find('.dh-cards-container');
-        $container.css({ 'padding-bottom': `${bottom}px` });
+        if (this._container) this._container.style.paddingBottom = `${bottom}px`;
 
-        $wrapper.css({
-            'transform': `scale(${scale})`,
-            'transform-origin': 'bottom center',
-            'width': `${width}px`
-        });
+        if (wrapper) {
+            wrapper.style.transform = `scale(${scale})`;
+            wrapper.style.transformOrigin = 'bottom center';
+            wrapper.style.width = `${width}px`;
+        }
 
         this.applyCardFanLayout();
     }
 
     static async savePosition(left) {
-
         if (!game.modules.get(this.MODULE_NAME)?.active) return;
 
         try {
             await game.user.setFlag(this.MODULE_NAME, 'handPosition', { left });
         } catch (e) {
-            console.warn("Quick Items Daggerheart | Failed to save position:", e);
+            console.warn(`${this.MODULE_NAME} | Failed to save position:`, e);
         }
     }
 
     static restorePosition() {
-
         if (!game.modules.get(this.MODULE_NAME)?.active) return;
 
         let pos;
         try {
             pos = game.user.getFlag(this.MODULE_NAME, 'handPosition');
         } catch (e) {
-            console.warn("Quick Items Daggerheart | Failed to read flags:", e);
+            console.warn(`${this.MODULE_NAME} | Failed to read flags:`, e);
             return;
         }
 
         if (pos && pos.left !== undefined) {
-            if (!this._$panel) this._$panel = $('#daggerheart-hand');
+            if (!this._panel) this._panel = document.getElementById('daggerheart-hand');
+            if (!this._panel) return;
 
-            this._$panel.css({
-                left: `${pos.left}px`,
-                transform: 'translateX(0)',
-                bottom: '0px'
-            });
+            this._panel.style.left = `${pos.left}px`;
+            this._panel.style.transform = 'translateX(0)';
+            this._panel.style.bottom = '0px';
 
             if (this._dndInstance) {
                 this._dndInstance.updatePosition(pos.left);
@@ -569,31 +599,31 @@ export class HandManager {
     }
 
     static refreshHand() {
-        if (!this._$panel) this.createHandPanel();
+        if (!this._panel) this.createHandPanel();
+        if (!this._panel) return;
 
         const isEnabled = this.getSetting(this.SETTING_ENABLED);
         if (!isEnabled) {
-            this._$panel.addClass('hidden');
+            this._panel.classList.add('hidden');
             return;
         }
 
         const controlled = canvas.tokens?.controlled || [];
         if (controlled.length === 0) {
-            this._$panel.addClass('hidden');
+            this._panel.classList.add('hidden');
             this._currentActor = null;
             return;
-        } else {
-            this._$panel.removeClass('hidden');
         }
+        this._panel.classList.remove('hidden');
 
-        const $container = this._$container;
-        $container.empty();
+        const container = this._container;
+        container.replaceChildren();
 
-        let actor = controlled[0].actor;
+        const actor = controlled[0].actor;
         this._currentActor = actor;
 
         if (!actor) {
-            $container.append(`<div class="no-cards">${this.translate('NO_ACTOR')}</div>`);
+            container.insertAdjacentHTML('beforeend', `<div class="no-cards">${this.escapeHtml(this.translate('NO_ACTOR'))}</div>`);
             return;
         }
 
@@ -622,21 +652,21 @@ export class HandManager {
             if (isConsumable && !showConsumables) return false;
 
             if (showEquippedOnly) {
-                if (item.system?.hasOwnProperty('equipped') && item.system.equipped == false) return false;
+                if (Object.prototype.hasOwnProperty.call(item.system ?? {}, 'equipped') && item.system.equipped == false) return false;
                 if (isDomain && item.system.inVault == true) return false;
             }
 
-            if (actor.system.isItemAvailable(item) == false) return false;
+            if (actor.system.isItemAvailable?.(item) == false) return false;
 
             return true;
         });
 
         // Detect adversary actors and prepare a synthetic standard-attack card if needed
-        const isAdversary = (actor.type === 'adversary') || (actor.system?.isAdversary) || (actor.system?.adversary);
+        const isAdversary = actor.type === 'adversary';
         const adversaryStandard = isAdversary ? this._createAdversaryStandardAttack(actor) : null;
 
         if (cards.length === 0 && !adversaryStandard) {
-            $container.append(`<div class="no-cards">${this.translate('NO_ITEMS')}</div>`);
+            container.insertAdjacentHTML('beforeend', `<div class="no-cards">${this.escapeHtml(this.translate('NO_ITEMS'))}</div>`);
             return;
         }
 
@@ -649,106 +679,97 @@ export class HandManager {
             return typeScore(a.type) - typeScore(b.type) || a.name.localeCompare(b.name);
         });
 
-        // Получаем текущий шаблон
         const template = this.currentTemplate;
-
         const fragment = document.createDocumentFragment();
 
         // If we built a synthetic adversary attack, add it first
         if (adversaryStandard) {
-            const el = this.createCardElement(adversaryStandard, template);
-            fragment.appendChild(el[0]);
+            fragment.appendChild(this.createCardElement(adversaryStandard, template));
         }
 
-        cards.forEach(item => {
-            const el = this.createCardElement(item, template);
-            fragment.appendChild(el[0]);
-        });
+        for (const item of cards) {
+            fragment.appendChild(this.createCardElement(item, template));
+        }
 
-        $container.append(fragment);
+        container.appendChild(fragment);
         this.applyCardFanLayout();
     }
 
+    /**
+     * @param {Item|Object} item
+     * @param {Object} template
+     * @returns {HTMLElement}
+     */
     static createCardElement(item, template) {
-        // Используем функцию renderCard из выбранного шаблона
-        const tempHtml = template.renderCard(item);
-        const html = `
-            <div class="dh-card" data-item-id="${item.id}" data-type="${item.type}">
-                <div class="dh-card-scaler">
-                ${tempHtml}
-                </div>
-            </div>
-        `;
-        const $el = $(html);
+        const el = document.createElement('div');
+        el.className = 'dh-card';
+        el.dataset.itemId = item.id;
+        el.dataset.type = item.type;
+        el.innerHTML = `<div class="dh-card-scaler">${template.renderCard(item)}</div>`;
 
-        new CardSmoothDnD($el[0], () => {
+        new CardSmoothDnD(el, () => {
             this.useItem(item);
         }, () => {
             this.applyCardFanLayout();
         });
 
-        // Открыть описание предмета по ПКМ (контекстное меню) — как при выборе "Редактировать"
-        $el.on('contextmenu', async (ev) => {
-            try {
-                ev.preventDefault();
-                ev.stopPropagation();
-
-                // Если это реальный документ Item (Foundry), попробуем открыть его лист
-                if (item && typeof item.sheet === 'object' && typeof item.sheet.render === 'function') {
-                    item.sheet.render(true);
-                    return;
-                }
-
-                // Если предмет привязан к актору и документ можно получить через actor.items
-                if (item && item.actor && item.actor.items && typeof item.actor.items.get === 'function') {
-                    const found = item.actor.items.get(item.id);
-                    if (found && typeof found.sheet === 'object' && typeof found.sheet.render === 'function') {
-                        found.sheet.render(true);
-                        return;
-                    }
-                }
-
-                // Для синтетических карточек (например, атака противника) показываем простое модальное окно с описанием
-                const title = item?.name || "Item";
-                const desc = HandManager.formatDescription(item?.system?.description?.value || item?.system?.description || '');
-                const content = `<div class="dh-item-sheet-preview">${desc}</div>`;
-
-                // Используем Foundry Dialog, если доступен
-                if (typeof Dialog === 'function') {
-                    new Dialog({
-                        title,
-                        content,
-                        buttons: { close: { label: game.i18n?.localize?.('Close') || 'Close' } },
-                        default: 'close'
-                    }).render(true);
-                } else {
-                    alert(`${title}\n\n${desc.replace(/<[^>]*>?/gm, '')}`);
-                }
-
-            } catch (err) {
-                console.error('QuickItems | Failed to open item sheet on context menu', err);
-            }
+        // Открыть лист предмета по ПКМ (как "Редактировать")
+        el.addEventListener('contextmenu', (ev) => {
+            ev.preventDefault();
+            ev.stopPropagation();
+            this._openItemSheet(item).catch(err =>
+                console.error(`${this.MODULE_NAME} | Failed to open item sheet on context menu`, err));
         });
 
-        return $el;
+        return el;
+    }
+
+    static async _openItemSheet(item) {
+        // Настоящий документ Item — открываем его лист
+        if (item?.sheet?.render) {
+            return item.sheet.render(true);
+        }
+
+        // Предмет привязан к актору — пробуем достать документ из actor.items
+        const found = item?.actor?.items?.get?.(item.id);
+        if (found?.sheet?.render) {
+            return found.sheet.render(true);
+        }
+
+        // Синтетическая карточка (например, атака противника) — показываем описание в DialogV2
+        const title = item?.name || 'Item';
+        const desc = this.formatDescription(item?.system?.description?.value || item?.system?.description || '');
+        const content = `<div class="dh-item-sheet-preview">${desc}</div>`;
+
+        const DialogV2 = foundry.applications?.api?.DialogV2;
+        if (DialogV2) {
+            return DialogV2.prompt({
+                window: { title },
+                content,
+                ok: { label: game.i18n?.localize?.('Close') || 'Close' }
+            });
+        }
+        // Environment without DialogV2 (should not happen on FVTT 13+)
+        ui.notifications?.info(`${title}: ${desc.replace(/<[^>]*>?/gm, '')}`);
     }
 
     static applyCardFanLayout() {
-        if (!this._$container) return;
+        if (!this._container) return;
 
-        const cards = this._$container.children('.dh-card');
+        const cards = [...this._container.children].filter(el => el.classList.contains('dh-card'));
         const count = cards.length;
         if (count === 0) return;
 
         const maxAngle = this.getSetting(this.SETTING_ARC_ANGLE);
-        const wrapperWidth = this._$panel.find('.hand-wrapper').width();
+        const wrapper = this._panel?.querySelector('.hand-wrapper');
+        const wrapperWidth = wrapper?.clientWidth || 0;
         const cardWidth = 160;
         const availableSpace = wrapperWidth - 40;
 
         let marginLeft = -20;
         const totalNeeded = count * cardWidth;
 
-        if (totalNeeded > availableSpace) {
+        if (totalNeeded > availableSpace && count > 1) {
             const spacePerCard = (availableSpace - cardWidth) / (count - 1);
             marginLeft = spacePerCard - cardWidth;
         }
@@ -759,17 +780,15 @@ export class HandManager {
         const centerIndex = (count - 1) / 2;
         const angleStep = count > 1 ? maxAngle / (count / 2) : 0;
 
-        cards.each((index, element) => {
+        cards.forEach((element, index) => {
             if (element.classList.contains('dragging')) return;
 
             const style = element.style;
 
             // Temporarily disable transition so the card doesn't animate from the
             // default (0deg) to the target rotation when the DOM is rebuilt.
-            // We'll restore the transition in the next animation frame so
-            // subsequent interactions still animate smoothly.
-            const prevTransition = element.style.transition;
-            element.style.transition = 'none';
+            const prevTransition = style.transition;
+            style.transition = 'none';
 
             style.marginLeft = index > 0 ? `${marginLeft}px` : '0px';
             style.zIndex = index + 1;
@@ -785,12 +804,9 @@ export class HandManager {
             }
 
             // Restore transition in the next frame so future transform changes animate.
-            (function(el, original) {
-                requestAnimationFrame(() => {
-                    // Only clear the inline override if it wasn't modified elsewhere.
-                    if (el && el.style) el.style.transition = original || '';
-                });
-            })(element, prevTransition);
+            requestAnimationFrame(() => {
+                style.transition = prevTransition || '';
+            });
         });
     }
 
@@ -811,21 +827,20 @@ export class HandManager {
         }
 
         try {
-            if (item.roll) return await item.roll(safeEvent);
-            if (item.use) {
-                return await item.use(safeEvent);
-            }
+            // Foundryborne items expose use(event); synthetic cards define their own
+            if (typeof item.use === 'function') return await item.use(safeEvent);
+            if (typeof item.roll === 'function') return await item.roll(safeEvent);
+            this.sendToChat(item);
         } catch (e) {
-            console.error("QuickItems | Roll Error:", e);
+            console.error(`${this.MODULE_NAME} | Roll Error:`, e);
             this.sendToChat(item);
         }
     }
 
     static async sendToChat(item) {
-        const speaker = ChatMessage.getSpeaker({ actor: item.actor });
-        if (typeof item.displayCard === 'function') {
-            return item.displayCard({ speaker });
+        // Foundryborne: Item#toChat(origin) expects the item uuid
+        if (typeof item.toChat === 'function' && item.uuid) {
+            return item.toChat(item.uuid);
         }
-        item.toChat?.();
     }
 }
